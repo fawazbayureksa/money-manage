@@ -10,7 +10,7 @@ import (
 var DB *gorm.DB
 
 func ConnectDatabase() {
-    dsn := "root:@tcp(127.0.0.1:3306)/go_project?charset=utf8mb4&parseTime=True&loc=Local"
+    dsn := "root:@tcp(127.0.0.1:3306)/money_manage?charset=utf8mb4&parseTime=True&loc=Local"
     database, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 
     if err != nil {
