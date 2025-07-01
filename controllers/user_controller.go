@@ -5,6 +5,7 @@ import (
     "my-api/models"
     "github.com/gin-gonic/gin"
     "net/http"
+     "my-api/utils"
 )
 
 func GetUsers(c *gin.Context) {
@@ -16,11 +17,11 @@ func GetUsers(c *gin.Context) {
 func CreateUser(c *gin.Context) {
     var user models.User
     if err := c.ShouldBindJSON(&user); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+         utils.JSONError(c, http.StatusBadRequest, "Failed to fetch users")
         return
     }
     config.DB.Create(&user)
-    c.JSON(http.StatusCreated, user)
+    utils.JSONSuccess(c, "User Create successfully", user)
 }
 
 func UpdateUser(c *gin.Context) {
@@ -30,14 +31,14 @@ func UpdateUser(c *gin.Context) {
     // Find the existing user
     var user models.User
     if err := config.DB.First(&user, id).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+        utils.JSONError(c, http.StatusNotFound, "User not found")
         return
     }
 
     // Bind the JSON input to a new user struct
     var updatedUser models.User
     if err := c.ShouldBindJSON(&updatedUser); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid input data")
         return
     }
 
@@ -48,12 +49,12 @@ func UpdateUser(c *gin.Context) {
 
     // Save the updated user to the database
     if err := config.DB.Save(&user).Error; err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
+        utils.JSONError(c, http.StatusInternalServerError, "Failed to update user")
         return
     }
 
     // Return the updated user
-    c.JSON(http.StatusOK, user)
+    utils.JSONSuccess(c, "User updated successfully", user)
 }
 
 func DeleteUser(c *gin.Context) {
@@ -63,16 +64,16 @@ func DeleteUser(c *gin.Context) {
     // Find the user to delete
     var user models.User
     if err := config.DB.First(&user, id).Error; err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+          utils.JSONError(c, http.StatusNotFound, "User not found")
         return
     }
 
     // Delete the user from the database
     if err := config.DB.Delete(&user).Error; err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+        utils.JSONError(c, http.StatusInternalServerError, "Failed to delete user")
         return
     }
 
     // Return a success message
-    c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+     utils.JSONSuccess(c, "User Deleted successfully", nil)
 }

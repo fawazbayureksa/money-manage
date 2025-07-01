@@ -14,7 +14,11 @@ func SetupRouter() *gin.Engine {
         api.POST("/users", controllers.CreateUser)
         api.PUT("/users/:id", controllers.UpdateUser)
         api.DELETE("/users/:id", controllers.DeleteUser)
+
+        api.GET("/banks", controllers.GetBank)
+        api.POST("/banks", controllers.CreateBank)
     }
+    
 
     return r
 }
