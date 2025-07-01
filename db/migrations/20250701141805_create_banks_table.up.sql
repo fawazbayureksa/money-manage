@@ -1,0 +1,7 @@
+CREATE TABLE banks (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    bank_name VARCHAR(100) NOT NULL,
+    color VARCHAR(100) NOT NULL,
+    image TEXT NOT NULL,
+    PRIMARY KEY (id)
+);
