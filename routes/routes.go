@@ -5,13 +5,13 @@ import (
     "my-api/controllers"
 )
 
-func SetupRouter() *gin.Engine {
-    r := gin.Default()
+func SetupRouter(router *gin.Engine) {
 
-    api := r.Group("/api")
+    api := router.Group("/api")
     {
         api.GET("/users", controllers.GetUsers)
         api.POST("/users", controllers.CreateUser)
+        api.POST("/register", controllers.Register)
         api.PUT("/users/:id", controllers.UpdateUser)
         api.DELETE("/users/:id", controllers.DeleteUser)
 
@@ -20,5 +20,5 @@ func SetupRouter() *gin.Engine {
     }
     
 
-    return r
+    return 
 }

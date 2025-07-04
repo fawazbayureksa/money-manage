@@ -5,7 +5,7 @@ import (
     "my-api/models"
     "github.com/gin-gonic/gin"
     "net/http"
-     "my-api/utils"
+    "my-api/utils" 
 )
 
 func GetUsers(c *gin.Context) {
@@ -76,4 +76,35 @@ func DeleteUser(c *gin.Context) {
 
     // Return a success message
      utils.JSONSuccess(c, "User Deleted successfully", nil)
+}
+
+
+func Register(c *gin.Context) {
+    var user models.User
+
+    if err := c.ShouldBindJSON(&user); err != nil {
+        utils.JSONError(c, http.StatusBadRequest, "Invalid input data")
+        return
+    }
+    
+    // Check if the user already exists
+    
+    if err := config.DB.Where("email =?", user.Email).First(&user).Error; err == nil {
+        utils.JSONError(c, http.StatusConflict, "User already exists")
+        return
+    }
+    
+    // Hash the user's password
+    hashedPassword, err := utils.HashPassword(user.Password)
+   
+    if err != nil {
+        utils.JSONError(c, http.StatusInternalServerError, "Failed to hash password")
+        return
+    }
+
+    user.Password = hashedPassword
+
+    // Save the user to the database
+    config.DB.Create(&user)
+    utils.JSONSuccess(c, "User registered successfully", user)
 }
