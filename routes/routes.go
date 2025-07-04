@@ -9,12 +9,14 @@ func SetupRouter(router *gin.Engine) {
 
     api := router.Group("/api")
     {
+        api.POST("/register", controllers.Register)
+        api.POST("/login", controllers.Login)
+
         api.GET("/users", controllers.GetUsers)
         api.POST("/users", controllers.CreateUser)
-        api.POST("/register", controllers.Register)
         api.PUT("/users/:id", controllers.UpdateUser)
         api.DELETE("/users/:id", controllers.DeleteUser)
-
+        
         api.GET("/banks", controllers.GetBank)
         api.POST("/banks", controllers.CreateBank)
     }
