@@ -23,3 +23,13 @@ func CreateBank(c *gin.Context) {
     config.DB.Create(&bank)
     utils.JSONSuccess(c, "Bank Create successfully", bank)
 }
+
+func DeleteBank(c *gin.Context) {
+    var bank models.Bank
+    if err := config.DB.Where("id = ?", c.Param("id")).First(&bank).Error; err != nil {
+        utils.JSONError(c, http.StatusBadRequest, "Bank not found")
+        return
+    }
+    config.DB.Delete(&bank)
+    utils.JSONSuccess(c, "Bank successfully deleted", bank)
+}

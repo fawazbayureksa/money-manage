@@ -19,6 +19,7 @@ func SetupRouter(router *gin.Engine) {
         
         api.GET("/banks", controllers.GetBank)
         api.POST("/banks", controllers.CreateBank)
+        api.DELETE("/banks/:id", controllers.DeleteBank)
     }
     
 
