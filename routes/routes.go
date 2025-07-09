@@ -20,6 +20,10 @@ func SetupRouter(router *gin.Engine) {
         api.GET("/banks", controllers.GetBank)
         api.POST("/banks", controllers.CreateBank)
         api.DELETE("/banks/:id", controllers.DeleteBank)
+
+        api.GET("/categories", controllers.GetCategories)
+        api.POST("/categories", controllers.CreateCategory)
+        api.DELETE("/categories/:id", controllers.DeleteCategory)
     }
     
 
