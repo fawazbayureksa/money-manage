@@ -3,6 +3,8 @@ package routes
 import (
     "github.com/gin-gonic/gin"
     "my-api/controllers"
+    "my-api/middleware"
+    // ... other imports
 )
 
 func SetupRouter(router *gin.Engine) {
@@ -22,10 +24,16 @@ func SetupRouter(router *gin.Engine) {
         api.DELETE("/banks/:id", controllers.DeleteBank)
 
         api.GET("/categories", controllers.GetCategories)
-        api.POST("/categories", controllers.CreateCategory)
-        api.DELETE("/categories/:id", controllers.DeleteCategory)
     }
     
+    
+    authorized := router.Group("/api")
+    authorized.Use(middleware.AuthMiddleware())
+    {
+        authorized.GET("/my-categories", controllers.GetCategoriesByUser)
+        authorized.POST("/categories", controllers.CreateCategory)
+        authorized.DELETE("/categories/:id", controllers.DeleteCategory)
+    }
 
     return 
 }

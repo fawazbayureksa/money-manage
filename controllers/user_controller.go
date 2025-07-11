@@ -48,6 +48,16 @@ func UpdateUser(c *gin.Context) {
     user.Email = updatedUser.Email
     user.Address = updatedUser.Address
 
+
+    hashedPassword, err := utils.HashPassword(user.Password)
+   
+    if err != nil {
+        utils.JSONError(c, http.StatusInternalServerError, "Failed to hash password")
+        return
+    }
+
+    user.Password = hashedPassword
+
     // Save the updated user to the database
     if err := config.DB.Save(&user).Error; err != nil {
         utils.JSONError(c, http.StatusInternalServerError, "Failed to update user")
