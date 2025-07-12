@@ -61,11 +61,13 @@ func CreateCategory(c *gin.Context) {
 }
 
 func DeleteCategory(c *gin.Context) {
-    var categories models.Category
-    if err := config.DB.Where("id = ?", c.Param("id")).First(&categories).Error; err != nil {
-        utils.JSONError(c, http.StatusBadRequest, "Categories not found")
+    // Get the user ID from the JWT token
+    var category models.Category
+    if err := config.DB.Where("id = ?", c.Param("id")).First(&category).Error; err != nil {
+        utils.JSONError(c, http.StatusBadRequest, "Category not found")
         return
     }
-    config.DB.Delete(&categories)
-    utils.JSONSuccess(c, "Category successfully deleted", categories)
+    config.DB.Delete(&category)
+
+    utils.JSONSuccess(c, "Category successfully deleted", nil)
 }

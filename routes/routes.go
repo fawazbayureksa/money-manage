@@ -32,8 +32,8 @@ func SetupRouter(router *gin.Engine) {
     {
         authorized.GET("/my-categories", controllers.GetCategoriesByUser)
         authorized.POST("/categories", controllers.CreateCategory)
-        authorized.DELETE("/categories/:id", controllers.DeleteCategory)
     }
+    api.DELETE("/categories/:id", controllers.DeleteCategory)
 
     return 
 }
