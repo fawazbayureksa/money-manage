@@ -24,6 +24,7 @@ func SetupRouter(router *gin.Engine) {
         api.DELETE("/banks/:id", controllers.DeleteBank)
 
         api.GET("/categories", controllers.GetCategories)
+        api.GET("/transaction/initial-data", controllers.GetInitialData)
     }
     
     

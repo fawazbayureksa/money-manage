@@ -13,5 +13,5 @@ type User struct {
 }
 
 func AutoMigrate() {
-    config.DB.AutoMigrate(&User{},&Bank{},&Category{})
+    config.DB.AutoMigrate(&User{},&Bank{},&Category{},&Transaction{})
 }
