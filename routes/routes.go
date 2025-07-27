@@ -31,6 +31,7 @@ func SetupRouter(router *gin.Engine) {
     authorized := router.Group("/api")
     authorized.Use(middleware.AuthMiddleware())
     {
+        authorized.POST("/transaction", controllers.CreateTransaction)
         authorized.GET("/my-categories", controllers.GetCategoriesByUser)
         authorized.POST("/categories", controllers.CreateCategory)
     }
