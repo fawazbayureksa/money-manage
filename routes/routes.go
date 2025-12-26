@@ -13,33 +13,39 @@ func SetupRouter(router *gin.Engine) {
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(config.DB)
 	bankRepo := repositories.NewBankRepository(config.DB)
+	budgetRepo := repositories.NewBudgetRepository(config.DB)
+	analyticsRepo := repositories.NewAnalyticsRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
 	bankService := services.NewBankService(bankRepo)
+	budgetService := services.NewBudgetService(budgetRepo)
+	analyticsService := services.NewAnalyticsService(analyticsRepo, budgetRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
 	bankController := controllers.NewBankController(bankService)
+	budgetController := controllers.NewBudgetController(budgetService)
+	analyticsController := controllers.NewAnalyticsController(analyticsService)
 
 	api := router.Group("/api")
 	{
-		// Auth routes (no changes needed for now)
+		// Auth routes
 		api.POST("/register", controllers.Register)
 		api.POST("/login", controllers.Login)
 
-		// User routes with new controller structure
+		// User routes
 		api.GET("/users", userController.GetUsers)
 		api.POST("/users", userController.CreateUser)
 		api.PUT("/users/:id", userController.UpdateUser)
 		api.DELETE("/users/:id", userController.DeleteUser)
 
-		// Bank routes with new controller structure
+		// Bank routes
 		api.GET("/banks", bankController.GetBanks)
 		api.POST("/banks", bankController.CreateBank)
 		api.DELETE("/banks/:id", bankController.DeleteBank)
 
-		// Category routes (no changes for now)
+		// Category routes
 		api.GET("/categories", controllers.GetCategories)
 		api.GET("/transaction/initial-data", controllers.GetInitialData)
 		api.DELETE("/categories/:id", controllers.DeleteCategory)
@@ -49,8 +55,31 @@ func SetupRouter(router *gin.Engine) {
 	authorized := router.Group("/api")
 	authorized.Use(middleware.AuthMiddleware())
 	{
+		// Transaction routes
 		authorized.POST("/transaction", controllers.CreateTransaction)
+		
+		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)
 		authorized.POST("/categories", controllers.CreateCategory)
+
+		// Budget routes
+		authorized.POST("/budgets", budgetController.CreateBudget)
+		authorized.GET("/budgets", budgetController.GetBudgets)
+		authorized.GET("/budgets/:id", budgetController.GetBudget)
+		authorized.PUT("/budgets/:id", budgetController.UpdateBudget)
+		authorized.DELETE("/budgets/:id", budgetController.DeleteBudget)
+		authorized.GET("/budgets/status", budgetController.GetBudgetStatus)
+		authorized.GET("/budget-alerts", budgetController.GetAlerts)
+		authorized.PUT("/budget-alerts/:id/read", budgetController.MarkAlertAsRead)
+
+		// Analytics routes
+		authorized.GET("/analytics/dashboard", analyticsController.GetDashboardSummary)
+		authorized.GET("/analytics/spending-by-category", analyticsController.GetSpendingByCategory)
+		authorized.GET("/analytics/spending-by-bank", analyticsController.GetSpendingByBank)
+		authorized.GET("/analytics/income-vs-expense", analyticsController.GetIncomeVsExpense)
+		authorized.GET("/analytics/trend", analyticsController.GetTrendAnalysis)
+		authorized.GET("/analytics/monthly-comparison", analyticsController.GetMonthlyComparison)
+		authorized.GET("/analytics/yearly-report", analyticsController.GetYearlyReport)
+		authorized.GET("/analytics/category-trend/:category_id", analyticsController.GetCategoryTrend)
 	}
 }

@@ -153,6 +153,30 @@ POST   /api/transaction          Create transaction (protected)
 GET    /api/transaction/initial-data  Get initial data
 ```
 
+### Budgets (protected)
+```
+POST   /api/budgets              Create budget
+GET    /api/budgets              Get all budgets (paginated, filterable)
+GET    /api/budgets/:id          Get budget with spending data
+PUT    /api/budgets/:id          Update budget
+DELETE /api/budgets/:id          Delete budget
+GET    /api/budgets/status       Get active budgets status
+GET    /api/budget-alerts        Get budget alerts
+PUT    /api/budget-alerts/:id/read  Mark alert as read
+```
+
+### Analytics (protected)
+```
+GET    /api/analytics/dashboard             Complete dashboard summary
+GET    /api/analytics/spending-by-category  Category breakdown
+GET    /api/analytics/spending-by-bank      Bank usage analysis
+GET    /api/analytics/income-vs-expense     Income vs Expense
+GET    /api/analytics/trend                 Trend analysis
+GET    /api/analytics/monthly-comparison    Month-to-month comparison
+GET    /api/analytics/yearly-report         Annual financial report
+GET    /api/analytics/category-trend/:id    Category trends
+```
+
 ## 📊 API Features
 
 ### Pagination
@@ -336,4 +360,32 @@ This project demonstrates:
 - Pagination & filtering implementation
 - Repository and Service patterns
 
-Perfect for learning Go or showcasing in your portfolio! 🚀
+
+## Advanced Features Implemented
+
+### Budget Management
+- Create and manage monthly/yearly budgets per category
+- Real-time spending tracking against budgets
+- Automatic alerts when reaching thresholds
+- Budget status monitoring (safe/warning/exceeded)
+- Multiple budgets per user with pagination
+
+### Analytics & Reports
+- Comprehensive dashboard with key financial metrics
+- Spending analysis by category and bank
+- Income vs Expense tracking with savings rate
+- Trend analysis (daily/weekly/monthly/yearly)
+- Month-to-month comparison with percentage changes
+- Yearly financial reports
+- Category-specific spending trends
+
+See ADVANCED_FEATURES.md for complete documentation.
+
+## Next Steps:
+- Fix security issues (JWT secret in env, rate limiting)
+- Write unit and integration tests
+- Add Swagger/OpenAPI documentation
+- Implement soft deletes
+- Add database indexes for performance
+- Docker containerization
+- CI/CD pipeline setup
