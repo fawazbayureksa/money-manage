@@ -22,8 +22,8 @@ func Register(c *gin.Context) {
     }
     
     // Check if the user already exists
-    
-    if err := config.DB.Where("email =?", user.Email).First(&user).Error; err == nil {
+    var existingUser models.User
+    if err := config.DB.Where("email = ?", user.Email).First(&existingUser).Error; err == nil {
         utils.JSONError(c, http.StatusConflict, "User already exists")
         return
     }
@@ -37,6 +37,8 @@ func Register(c *gin.Context) {
     }
 
     user.Password = hashedPassword
+    user.IsVerified = true // For simplicity, mark as verified
+    user.IsAdmin = false  // Default to non-admin
 
     // Save the user to the database
     config.DB.Create(&user)
@@ -57,8 +59,8 @@ func Login(c *gin.Context) {
         return
     }
 
-	// ✅ Compare input.Password with user.Password (hashed)
-    if err := utils.CheckPasswordHash(input.Password,user.Password); !err {
+	// Compare input.Password with user.Password (hashed)
+    if !utils.CheckPasswordHash(input.Password, user.Password) {
         utils.JSONError(c, http.StatusUnauthorized, "Incorrect password")
         return
     }
@@ -71,4 +73,18 @@ func Login(c *gin.Context) {
 	}
 
 	utils.JSONSuccess(c, "Login successful", gin.H{"user": user, "token": token})
+}
+
+func Logout(c *gin.Context) {
+	// In JWT-based auth, logout is typically handled client-side by removing the token
+	// This endpoint confirms the logout action
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	// Optionally, you can log the logout action or invalidate refresh tokens here
+	// For now, we just return a success response
+	utils.JSONSuccess(c, "Logout successful", gin.H{"user_id": userID})
 }

@@ -58,6 +58,9 @@ func SetupRouter(router *gin.Engine) {
 	authorized := router.Group("/api")
 	authorized.Use(middleware.AuthMiddleware())
 	{
+		// Auth routes (protected)
+		authorized.POST("/logout", controllers.Logout)
+
 		// Transaction routes
 		authorized.GET("/transactions", transactionController.GetTransactions)
 		authorized.GET("/transactions/:id", transactionController.GetTransactionByID)
