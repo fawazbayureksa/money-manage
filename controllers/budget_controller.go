@@ -6,7 +6,7 @@ import (
 	"my-api/utils"
 	"net/http"
 	"strconv"
-
+	"time"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,10 +25,62 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 		return
 	}
 
-	var req dto.CreateBudgetRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid input data")
+	// Parse JSON into a map first to handle date conversion
+	var payload map[string]interface{}
+	if err := c.ShouldBindJSON(&payload); err != nil {
+		utils.JSONError(c, http.StatusBadRequest, "Invalid JSON payload")
 		return
+	}
+
+	// Create the request struct
+	var req dto.CreateBudgetRequest
+
+	// Manually map fields with proper type conversion
+	if categoryID, ok := payload["category_id"].(float64); ok {
+		req.CategoryID = uint(categoryID)
+	} else {
+		utils.JSONError(c, http.StatusBadRequest, "category_id is required")
+		return
+	}
+
+	if amount, ok := payload["amount"].(float64); ok {
+		req.Amount = int(amount)
+	} else {
+		utils.JSONError(c, http.StatusBadRequest, "amount is required")
+		return
+	}
+
+	if period, ok := payload["period"].(string); ok {
+		req.Period = period
+	} else {
+		utils.JSONError(c, http.StatusBadRequest, "period is required")
+		return
+	}
+
+	// Parse start_date
+	if startDateStr, ok := payload["start_date"].(string); ok {
+		startDate, err := time.Parse("2006-01-02", startDateStr)
+		if err != nil {
+			// Try ISO 8601 format
+			startDate, err = time.Parse(time.RFC3339, startDateStr)
+			if err != nil {
+				utils.JSONError(c, http.StatusBadRequest, "Invalid start_date format. Use YYYY-MM-DD or ISO 8601")
+				return
+			}
+		}
+		req.StartDate = startDate
+	} else {
+		utils.JSONError(c, http.StatusBadRequest, "start_date is required")
+		return
+	}
+
+	// Optional fields
+	if alertAt, ok := payload["alert_at"].(float64); ok {
+		req.AlertAt = int(alertAt)
+	}
+
+	if description, ok := payload["description"].(string); ok {
+		req.Description = description
 	}
 
 	budget, err := ctrl.service.CreateBudget(userID.(uint), &req)

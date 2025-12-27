@@ -158,14 +158,31 @@ func (s *budgetService) CheckBudgetAlerts(userID uint) error {
 		percentage := float64(spent) / float64(budget.Amount) * 100
 
 		if percentage >= float64(budget.AlertAt) {
-			alert := &models.BudgetAlert{
-				BudgetID:    budget.ID,
-				UserID:      userID,
-				Percentage:  int(percentage),
-				SpentAmount: spent,
-				Message:     fmt.Sprintf("You have spent %.0f%% of your %s budget for %s", percentage, budget.Period, budget.Category.CategoryName),
+			// Check if alert already exists for this budget at this percentage level
+			existingAlerts, _ := s.repo.GetUserAlerts(userID, true)
+			alertExists := false
+			for _, existing := range existingAlerts {
+				if existing.BudgetID == budget.ID && existing.Percentage >= int(percentage)-5 {
+					alertExists = true
+					break
+				}
 			}
-			s.repo.CreateAlert(alert)
+
+			// Only create alert if it doesn't exist
+			if !alertExists {
+				statusMsg := "reached"
+				if percentage >= 100 {
+					statusMsg = "exceeded"
+				}
+				alert := &models.BudgetAlert{
+					BudgetID:    budget.ID,
+					UserID:      userID,
+					Percentage:  int(percentage),
+					SpentAmount: spent,
+					Message:     fmt.Sprintf("You have %s %.0f%% of your %s budget", statusMsg, percentage, budget.Category.CategoryName),
+				}
+				s.repo.CreateAlert(alert)
+			}
 		}
 	}
 
@@ -180,7 +197,7 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 
 	responses := make([]dto.BudgetAlertResponse, len(alerts))
 	for i, alert := range alerts {
-		responses[i] = dto.BudgetAlertResponse{
+		response := dto.BudgetAlertResponse{
 			ID:          alert.ID,
 			BudgetID:    alert.BudgetID,
 			Percentage:  alert.Percentage,
@@ -189,6 +206,17 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 			IsRead:      alert.IsRead,
 			CreatedAt:   alert.CreatedAt,
 		}
+		
+		// Include budget and category information if available
+		if alert.Budget.ID > 0 {
+			response.CategoryID = alert.Budget.CategoryID
+			response.BudgetAmount = alert.Budget.Amount
+			if alert.Budget.Category.ID > 0 {
+				response.CategoryName = alert.Budget.Category.CategoryName
+			}
+		}
+		
+		responses[i] = response
 	}
 
 	return responses, nil

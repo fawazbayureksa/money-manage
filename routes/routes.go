@@ -29,7 +29,7 @@ func SetupRouter(router *gin.Engine) {
 	bankController := controllers.NewBankController(bankService)
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
-	transactionController := controllers.NewTransactionController(transactionService)
+	transactionController := controllers.NewTransactionController(transactionService, budgetService)
 
 	api := router.Group("/api")
 	{
@@ -70,10 +70,10 @@ func SetupRouter(router *gin.Engine) {
 		// Budget routes
 		authorized.POST("/budgets", budgetController.CreateBudget)
 		authorized.GET("/budgets", budgetController.GetBudgets)
+		authorized.GET("/budgets/status", budgetController.GetBudgetStatus)
 		authorized.GET("/budgets/:id", budgetController.GetBudget)
 		authorized.PUT("/budgets/:id", budgetController.UpdateBudget)
 		authorized.DELETE("/budgets/:id", budgetController.DeleteBudget)
-		authorized.GET("/budgets/status", budgetController.GetBudgetStatus)
 		authorized.GET("/budget-alerts", budgetController.GetAlerts)
 		authorized.PUT("/budget-alerts/:id/read", budgetController.MarkAlertAsRead)
 

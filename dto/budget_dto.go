@@ -50,11 +50,14 @@ type BudgetFilterRequest struct {
 }
 
 type BudgetAlertResponse struct {
-	ID          uint      `json:"id"`
-	BudgetID    uint      `json:"budget_id"`
-	Percentage  int       `json:"percentage"`
-	SpentAmount int       `json:"spent_amount"`
-	Message     string    `json:"message"`
-	IsRead      bool      `json:"is_read"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID           uint      `json:"id"`
+	BudgetID     uint      `json:"budget_id"`
+	Percentage   int       `json:"percentage"`
+	SpentAmount  int       `json:"spent_amount"`
+	Message      string    `json:"message"`
+	IsRead       bool      `json:"is_read"`
+	CreatedAt    time.Time `json:"created_at"`
+	CategoryID   uint      `json:"category_id,omitempty"`
+	CategoryName string    `json:"category_name,omitempty"`
+	BudgetAmount int       `json:"budget_amount,omitempty"`
 }

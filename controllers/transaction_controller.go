@@ -13,11 +13,13 @@ import (
 
 type TransactionController struct {
     transactionService services.TransactionService
+    budgetService      services.BudgetService
 }
 
-func NewTransactionController(transactionService services.TransactionService) *TransactionController {
+func NewTransactionController(transactionService services.TransactionService, budgetService services.BudgetService) *TransactionController {
     return &TransactionController{
         transactionService: transactionService,
+        budgetService:      budgetService,
     }
 }
 
@@ -224,6 +226,12 @@ func (ctrl *TransactionController) CreateTransaction(c *gin.Context) {
         utils.JSONError(c, http.StatusInternalServerError, "Failed to create transaction")
         return
     }
+
+    // Check budget alerts if this is an expense transaction
+    if transaction.TransactionType == 2 {
+        ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+    }
+
     utils.JSONSuccess(c, "Transaction created successfully", transaction)
 
 }
