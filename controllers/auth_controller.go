@@ -2,51 +2,52 @@ package controllers
 
 import (
     "my-api/config"
+    "my-api/dto"
     "my-api/models"
+    "my-api/services"
     "github.com/gin-gonic/gin"
     "net/http"
     "my-api/utils" 
 )
+
+type AuthController struct {
+    userService services.UserService
+}
+
+func NewAuthController(userService services.UserService) *AuthController {
+    return &AuthController{userService: userService}
+}
 
 type LoginRequest struct {
     Email    string `json:"email" binding:"required,email"`
     Password string `json:"password" binding:"required"`
 }
 
-func Register(c *gin.Context) {
-    var user models.User
+func (ctrl *AuthController) Register(c *gin.Context) {
+    var req dto.CreateUserRequest
 
-    if err := c.ShouldBindJSON(&user); err != nil {
+    if err := c.ShouldBindJSON(&req); err != nil {
         utils.JSONError(c, http.StatusBadRequest, "Invalid input data")
         return
     }
-    
-    // Check if the user already exists
-    var existingUser models.User
-    if err := config.DB.Where("email = ?", user.Email).First(&existingUser).Error; err == nil {
-        utils.JSONError(c, http.StatusConflict, "User already exists")
-        return
-    }
-    
-    // Hash the user's password
-    hashedPassword, err := utils.HashPassword(user.Password)
-   
+
+    // Use the user service to create the user (handles password hashing)
+    user, err := ctrl.userService.CreateUser(&req)
     if err != nil {
-        utils.JSONError(c, http.StatusInternalServerError, "Failed to hash password")
+        if err.Error() == "user with this email already exists" {
+            utils.JSONError(c, http.StatusConflict, err.Error())
+            return
+        }
+        utils.JSONError(c, http.StatusInternalServerError, err.Error())
         return
     }
 
-    user.Password = hashedPassword
-    user.IsVerified = true // For simplicity, mark as verified
-    user.IsAdmin = false  // Default to non-admin
-
-    // Save the user to the database
-    config.DB.Create(&user)
     utils.JSONSuccess(c, "User registered successfully", user)
 }
 
-func Login(c *gin.Context) {
+func (ctrl *AuthController) Login(c *gin.Context) {
 	var input LoginRequest
+
 	if err := c.ShouldBindJSON(&input); err != nil {
         utils.JSONError(c, http.StatusBadRequest, "Invalid input data")
         return
@@ -72,10 +73,20 @@ func Login(c *gin.Context) {
         return
 	}
 
-	utils.JSONSuccess(c, "Login successful", gin.H{"user": user, "token": token})
+	// Create response without password
+	userResponse := dto.UserResponse{
+		ID:         user.ID,
+		Name:       user.Name,
+		Email:      user.Email,
+		Address:    user.Address,
+		IsVerified: user.IsVerified,
+		IsAdmin:    user.IsAdmin,
+	}
+
+	utils.JSONSuccess(c, "Login successful", gin.H{"user": userResponse, "token": token})
 }
 
-func Logout(c *gin.Context) {
+func (ctrl *AuthController) Logout(c *gin.Context) {
 	// In JWT-based auth, logout is typically handled client-side by removing the token
 	// This endpoint confirms the logout action
 	userID, exists := c.Get("user_id")

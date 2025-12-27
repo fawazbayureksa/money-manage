@@ -25,6 +25,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionService := services.NewTransactionService(transactionRepo)
 
 	// Initialize controllers
+	authController := controllers.NewAuthController(userService)
 	userController := controllers.NewUserController(userService)
 	bankController := controllers.NewBankController(bankService)
 	budgetController := controllers.NewBudgetController(budgetService)
@@ -34,8 +35,8 @@ func SetupRouter(router *gin.Engine) {
 	api := router.Group("/api")
 	{
 		// Auth routes
-		api.POST("/register", controllers.Register)
-		api.POST("/login", controllers.Login)
+		api.POST("/register", authController.Register)
+		api.POST("/login", authController.Login)
 
 		// User routes
 		api.GET("/users", userController.GetUsers)
@@ -59,7 +60,7 @@ func SetupRouter(router *gin.Engine) {
 	authorized.Use(middleware.AuthMiddleware())
 	{
 		// Auth routes (protected)
-		authorized.POST("/logout", controllers.Logout)
+		authorized.POST("/logout", authController.Logout)
 
 		// Transaction routes
 		authorized.GET("/transactions", transactionController.GetTransactions)
