@@ -3,12 +3,23 @@ package controllers
 import (
     "my-api/config"
     "my-api/models"
+    "my-api/services"
     "github.com/gin-gonic/gin"
     "my-api/utils"
     "net/http"
     "strconv"
     "time"
 )
+
+type TransactionController struct {
+    transactionService services.TransactionService
+}
+
+func NewTransactionController(transactionService services.TransactionService) *TransactionController {
+    return &TransactionController{
+        transactionService: transactionService,
+    }
+}
 
 func GetInitialData(c *gin.Context) {
 	var banks []models.Bank
@@ -28,7 +39,106 @@ func GetInitialData(c *gin.Context) {
     utils.JSONSuccess(c, "Initial data successfully fetched", data)
 }
 
-func CreateTransaction(c *gin.Context) {
+func (ctrl *TransactionController) GetTransactions(c *gin.Context) {
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+        return
+    }
+
+    userIDUint, ok := userID.(uint)
+    if !ok {
+        utils.JSONError(c, http.StatusInternalServerError, "Invalid user ID")
+        return
+    }
+
+    // Parse query parameters
+    page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+    limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+
+    // Parse optional filters
+    var startDate, endDate *time.Time
+    var transactionType *int
+    var categoryID, bankID *uint
+
+    if startDateStr := c.Query("start_date"); startDateStr != "" {
+        if parsed, err := time.Parse("2006-01-02", startDateStr); err == nil {
+            startDate = &parsed
+        }
+    }
+
+    if endDateStr := c.Query("end_date"); endDateStr != "" {
+        if parsed, err := time.Parse("2006-01-02", endDateStr); err == nil {
+            endDate = &parsed
+        }
+    }
+
+    if txTypeStr := c.Query("transaction_type"); txTypeStr != "" {
+        if txType, err := strconv.Atoi(txTypeStr); err == nil {
+            transactionType = &txType
+        }
+    }
+
+    if catIDStr := c.Query("category_id"); catIDStr != "" {
+        if catID, err := strconv.ParseUint(catIDStr, 10, 32); err == nil {
+            catIDUint := uint(catID)
+            categoryID = &catIDUint
+        }
+    }
+
+    if bankIDStr := c.Query("bank_id"); bankIDStr != "" {
+        if bID, err := strconv.ParseUint(bankIDStr, 10, 32); err == nil {
+            bIDUint := uint(bID)
+            bankID = &bIDUint
+        }
+    }
+
+    transactions, pagination, err := ctrl.transactionService.GetTransactions(
+        userIDUint, page, limit, startDate, endDate, transactionType, categoryID, bankID,
+    )
+
+    if err != nil {
+        utils.JSONError(c, http.StatusInternalServerError, "Failed to fetch transactions")
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "success": true,
+        "message": "Transactions fetched successfully",
+        "data":    transactions,
+        "pagination": pagination,
+    })
+}
+
+func (ctrl *TransactionController) GetTransactionByID(c *gin.Context) {
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+        return
+    }
+
+    userIDUint, ok := userID.(uint)
+    if !ok {
+        utils.JSONError(c, http.StatusInternalServerError, "Invalid user ID")
+        return
+    }
+
+    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        utils.JSONError(c, http.StatusBadRequest, "Invalid transaction ID")
+        return
+    }
+
+    transaction, err := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)
+    if err != nil {
+        utils.JSONError(c, http.StatusNotFound, "Transaction not found")
+        return
+    }
+
+    utils.JSONSuccess(c, "Transaction fetched successfully", transaction)
+}
+
+func (ctrl *TransactionController) CreateTransaction(c *gin.Context) {
 
     userID, exists := c.Get("user_id")
     if !exists {
@@ -75,21 +185,42 @@ func CreateTransaction(c *gin.Context) {
         transaction.Amount = int(amount)
     }
 
-    transaction.TransactionType = int(payload["TransactionType"].(float64))
+    // Handle TransactionType - can be string or number
+    if txTypeStr, ok := payload["TransactionType"].(string); ok {
+        // Convert string to number: "Income" = 1, "Expense" = 2
+        if txTypeStr == "Income" {
+            transaction.TransactionType = 1
+        } else if txTypeStr == "Expense" {
+            transaction.TransactionType = 2
+        } else {
+            utils.JSONError(c, http.StatusBadRequest, "Invalid transaction type. Must be 'Income' or 'Expense'")
+            return
+        }
+    } else if txType, ok := payload["TransactionType"].(float64); ok {
+        // If sent as number directly
+        transaction.TransactionType = int(txType)
+    }
 
-    // Parse date
+    // Parse date - support multiple formats
     dateStr := payload["Date"].(string)
-    date, err := time.Parse("2006-01-02", dateStr)
-
+    var date time.Time
+    var err error
+    
+    // Try ISO 8601 format first (2025-12-26T06:54:44.955Z)
+    date, err = time.Parse(time.RFC3339, dateStr)
     if err != nil {
-        utils.JSONError(c, http.StatusBadRequest, "Invalid date format")
-        return
+        // Try simple date format (2006-01-02)
+        date, err = time.Parse("2006-01-02", dateStr)
+        if err != nil {
+            utils.JSONError(c, http.StatusBadRequest, "Invalid date format. Use ISO 8601 or YYYY-MM-DD")
+            return
+        }
     }
 
     transaction.UserID = userIDUint
     transaction.Date   = date
 
-    if err := config.DB.Create(&transaction).Error; err != nil {
+    if err := ctrl.transactionService.CreateTransaction(&transaction); err != nil {
         utils.JSONError(c, http.StatusInternalServerError, "Failed to create transaction")
         return
     }

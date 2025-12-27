@@ -15,18 +15,21 @@ func SetupRouter(router *gin.Engine) {
 	bankRepo := repositories.NewBankRepository(config.DB)
 	budgetRepo := repositories.NewBudgetRepository(config.DB)
 	analyticsRepo := repositories.NewAnalyticsRepository(config.DB)
+	transactionRepo := repositories.NewTransactionRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
 	bankService := services.NewBankService(bankRepo)
 	budgetService := services.NewBudgetService(budgetRepo)
 	analyticsService := services.NewAnalyticsService(analyticsRepo, budgetRepo)
+	transactionService := services.NewTransactionService(transactionRepo)
 
 	// Initialize controllers
 	userController := controllers.NewUserController(userService)
 	bankController := controllers.NewBankController(bankService)
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
+	transactionController := controllers.NewTransactionController(transactionService)
 
 	api := router.Group("/api")
 	{
@@ -56,7 +59,9 @@ func SetupRouter(router *gin.Engine) {
 	authorized.Use(middleware.AuthMiddleware())
 	{
 		// Transaction routes
-		authorized.POST("/transaction", controllers.CreateTransaction)
+		authorized.GET("/transactions", transactionController.GetTransactions)
+		authorized.GET("/transactions/:id", transactionController.GetTransactionByID)
+		authorized.POST("/transaction", transactionController.CreateTransaction)
 		
 		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)
