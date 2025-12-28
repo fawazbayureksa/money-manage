@@ -76,7 +76,21 @@ func (ctrl *TransactionController) GetTransactions(c *gin.Context) {
     }
 
     if txTypeStr := c.Query("transaction_type"); txTypeStr != "" {
-        if txType, err := strconv.Atoi(txTypeStr); err == nil {
+        // Handle both string ("Income"/"Expense") and numeric (1/2) values
+        var txType int
+        if txTypeStr == "Income" || txTypeStr == "income" {
+            txType = 1
+        } else if txTypeStr == "Expense" || txTypeStr == "expense" {
+            txType = 2
+        } else {
+            // Try to parse as integer
+            if parsed, err := strconv.Atoi(txTypeStr); err == nil {
+                txType = parsed
+            }
+        }
+        
+        // Only set if valid type (1 or 2)
+        if txType == 1 || txType == 2 {
             transactionType = &txType
         }
     }

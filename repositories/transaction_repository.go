@@ -4,6 +4,7 @@ import (
 	"my-api/models"
 	"time"
 	"gorm.io/gorm"
+	"fmt"
 )
 
 type TransactionRepository interface {
@@ -36,6 +37,7 @@ func (r *transactionRepository) GetAll(userID uint, page, limit int, startDate, 
 		query = query.Where("date <= ?", endDate)
 	}
 	if transactionType != nil {
+		fmt.Println("Filtering by transaction type:", *transactionType)
 		query = query.Where("transaction_type = ?", *transactionType)
 	}
 	if categoryID != nil {
