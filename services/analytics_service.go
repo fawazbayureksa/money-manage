@@ -4,6 +4,7 @@ import (
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
+	"strconv"
 	"time"
 )
 
@@ -13,7 +14,7 @@ type AnalyticsService interface {
 	GetTrendAnalysis(userID uint, req *dto.AnalyticsRequest) (*dto.TrendAnalysisResponse, error)
 	GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error)
 	GetMonthlyComparison(userID uint, months int) ([]dto.MonthlyComparisonResponse, error)
-	GetDashboardSummary(userID uint) (*dto.DashboardSummaryResponse, error)
+	GetDashboardSummary(userID uint, startDate, endDate *time.Time) (*dto.DashboardSummaryResponse, error)
 	GetYearlyReport(userID uint, year int) (*dto.YearlyReportResponse, error)
 	GetCategoryTrend(userID uint, categoryID uint, req *dto.AnalyticsRequest) (*dto.CategoryTrendResponse, error)
 }
@@ -30,6 +31,44 @@ func NewAnalyticsService(analyticsRepo repositories.AnalyticsRepository, budgetR
 	}
 }
 
+// Helper function to safely convert interface{} to int
+func toInt(val interface{}) int {
+	switch v := val.(type) {
+	case int:
+		return v
+	case int64:
+		return int(v)
+	case float64:
+		return int(v)
+	case string:
+		// Try to parse string to int
+		if i, err := strconv.Atoi(v); err == nil {
+			return i
+		}
+		return 0
+	default:
+		return 0
+	}
+}
+
+// Helper function to safely convert interface{} to uint
+func toUint(val interface{}) uint {
+	switch v := val.(type) {
+	case uint:
+		return v
+	case uint64:
+		return uint(v)
+	case int:
+		return uint(v)
+	case int64:
+		return uint(v)
+	case float64:
+		return uint(v)
+	default:
+		return 0
+	}
+}
+
 func (s *analyticsService) GetSpendingByCategory(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByCategoryResponse, error) {
 	results, err := s.analyticsRepo.GetSpendingByCategory(userID, req.StartDate, req.EndDate, 2) // 2 = expense
 	if err != nil {
@@ -38,25 +77,23 @@ func (s *analyticsService) GetSpendingByCategory(userID uint, req *dto.Analytics
 
 	var totalAmount int64
 	for _, result := range results {
-		if amount, ok := result["total_amount"].(int64); ok {
-			totalAmount += amount
-		}
+		totalAmount += int64(toInt(result["total_amount"]))
 	}
 
 	responses := make([]dto.SpendingByCategoryResponse, len(results))
 	for i, result := range results {
-		amount := int(result["total_amount"].(int64))
+		amount := toInt(result["total_amount"])
 		percentage := float64(0)
 		if totalAmount > 0 {
 			percentage = float64(amount) / float64(totalAmount) * 100
 		}
 
 		responses[i] = dto.SpendingByCategoryResponse{
-			CategoryID:   uint(result["category_id"].(uint64)),
+			CategoryID:   toUint(result["category_id"]),
 			CategoryName: result["category_name"].(string),
 			TotalAmount:  amount,
 			Percentage:   percentage,
-			Count:        int(result["count"].(int64)),
+			Count:        toInt(result["count"]),
 		}
 	}
 
@@ -69,9 +106,9 @@ func (s *analyticsService) GetIncomeVsExpense(userID uint, req *dto.AnalyticsReq
 		return nil, err
 	}
 
-	income := int(result["total_income"].(int64))
-	expense := int(result["total_expense"].(int64))
-	net := int(result["net_amount"].(int64))
+	income := toInt(result["total_income"])
+	expense := toInt(result["total_expense"])
+	net := toInt(result["net_amount"])
 
 	savingsRate := float64(0)
 	if income > 0 {
@@ -82,8 +119,8 @@ func (s *analyticsService) GetIncomeVsExpense(userID uint, req *dto.AnalyticsReq
 		TotalIncome:  income,
 		TotalExpense: expense,
 		NetAmount:    net,
-		IncomeCount:  int(result["income_count"].(int64)),
-		ExpenseCount: int(result["expense_count"].(int64)),
+		IncomeCount:  toInt(result["income_count"]),
+		ExpenseCount: toInt(result["expense_count"]),
 		SavingsRate:  savingsRate,
 	}, nil
 }
@@ -96,8 +133,8 @@ func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsReque
 
 	dataPoints := make([]dto.TrendDataPoint, len(results))
 	for i, result := range results {
-		income := int(result["income"].(int64))
-		expense := int(result["expense"].(int64))
+		income := toInt(result["income"])
+		expense := toInt(result["expense"])
 		
 		dataPoints[i] = dto.TrendDataPoint{
 			Date:    result["month"].(string),
@@ -124,25 +161,23 @@ func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequ
 
 	var totalAmount int64
 	for _, result := range results {
-		if amount, ok := result["total_amount"].(int64); ok {
-			totalAmount += amount
-		}
+		totalAmount += int64(toInt(result["total_amount"]))
 	}
 
 	responses := make([]dto.SpendingByBankResponse, len(results))
 	for i, result := range results {
-		amount := int(result["total_amount"].(int64))
+		amount := toInt(result["total_amount"])
 		percentage := float64(0)
 		if totalAmount > 0 {
 			percentage = float64(amount) / float64(totalAmount) * 100
 		}
 
 		responses[i] = dto.SpendingByBankResponse{
-			BankID:      uint(result["bank_id"].(uint64)),
+			BankID:      toUint(result["bank_id"]),
 			BankName:    result["bank_name"].(string),
 			TotalAmount: amount,
 			Percentage:  percentage,
-			Count:       int(result["count"].(int64)),
+			Count:       toInt(result["count"]),
 		}
 	}
 
@@ -162,8 +197,8 @@ func (s *analyticsService) GetMonthlyComparison(userID uint, months int) ([]dto.
 	var prevIncome, prevExpense int
 
 	for i, result := range results {
-		income := int(result["income"].(int64))
-		expense := int(result["expense"].(int64))
+		income := toInt(result["income"])
+		expense := toInt(result["expense"])
 
 		incomeChange := float64(0)
 		expenseChange := float64(0)
@@ -191,10 +226,19 @@ func (s *analyticsService) GetMonthlyComparison(userID uint, months int) ([]dto.
 	return responses, nil
 }
 
-func (s *analyticsService) GetDashboardSummary(userID uint) (*dto.DashboardSummaryResponse, error) {
+func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *time.Time) (*dto.DashboardSummaryResponse, error) {
 	now := time.Now()
-	currentMonthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	currentMonthEnd := currentMonthStart.AddDate(0, 1, -1)
+	var currentMonthStart, currentMonthEnd time.Time
+	
+	// Use provided dates or default to current month
+	if startDate != nil && endDate != nil {
+		currentMonthStart = *startDate
+		currentMonthEnd = *endDate
+	} else {
+		currentMonthStart = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+		currentMonthEnd = currentMonthStart.AddDate(0, 1, -1)
+	}
+	
 	lastMonthStart := currentMonthStart.AddDate(0, -1, 0)
 	lastMonthEnd := currentMonthStart.AddDate(0, 0, -1)
 
@@ -273,7 +317,7 @@ func (s *analyticsService) GetCategoryTrend(userID uint, categoryID uint, req *d
 	var totalAmount int
 	
 	for i, result := range results {
-		amount := int(result["amount"].(int64))
+		amount := toInt(result["amount"])
 		totalAmount += amount
 		
 		dataPoints[i] = dto.TrendDataPoint{
@@ -329,25 +373,23 @@ func (s *analyticsService) toSpendingByCategoryResponses(results []map[string]in
 
 	var totalAmount int64
 	for _, result := range results {
-		if amount, ok := result["total_amount"].(int64); ok {
-			totalAmount += amount
-		}
+		totalAmount += int64(toInt(result["total_amount"]))
 	}
 
 	responses := make([]dto.SpendingByCategoryResponse, len(results))
 	for i, result := range results {
-		amount := int(result["total_amount"].(int64))
+		amount := toInt(result["total_amount"])
 		percentage := float64(0)
 		if totalAmount > 0 {
 			percentage = float64(amount) / float64(totalAmount) * 100
 		}
 
 		responses[i] = dto.SpendingByCategoryResponse{
-			CategoryID:   uint(result["category_id"].(uint64)),
+			CategoryID:   toUint(result["category_id"]),
 			CategoryName: result["category_name"].(string),
 			TotalAmount:  amount,
 			Percentage:   percentage,
-			Count:        int(result["count"].(int64)),
+			Count:        toInt(result["count"]),
 		}
 	}
 

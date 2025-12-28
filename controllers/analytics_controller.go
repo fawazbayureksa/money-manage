@@ -137,7 +137,20 @@ func (ctrl *AnalyticsController) GetDashboardSummary(c *gin.Context) {
 		return
 	}
 
-	result, err := ctrl.service.GetDashboardSummary(userID.(uint))
+	// Parse optional date parameters
+	var startDate, endDate *time.Time
+	if startDateStr := c.Query("start_date"); startDateStr != "" {
+		if parsed, err := time.Parse("2006-01-02", startDateStr); err == nil {
+			startDate = &parsed
+		}
+	}
+	if endDateStr := c.Query("end_date"); endDateStr != "" {
+		if parsed, err := time.Parse("2006-01-02", endDateStr); err == nil {
+			endDate = &parsed
+		}
+	}
+
+	result, err := ctrl.service.GetDashboardSummary(userID.(uint), startDate, endDate)
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return
