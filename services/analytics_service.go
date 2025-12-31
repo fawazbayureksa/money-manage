@@ -236,7 +236,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		currentMonthEnd = *endDate
 	} else {
 		currentMonthStart = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		currentMonthEnd = currentMonthStart.AddDate(0, 1, -1)
+		currentMonthEnd = time.Date(now.Year(), now.Month()+1, 0, 23, 59, 59, 0, now.Location())
 	}
 	
 	lastMonthStart := currentMonthStart.AddDate(0, -1, 0)
