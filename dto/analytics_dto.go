@@ -1,6 +1,9 @@
 package dto
 
-import "time"
+import (
+	"my-api/utils"
+	"time"
+)
 
 type AnalyticsRequest struct {
 	StartDate time.Time `form:"start_date" binding:"required"`
@@ -74,13 +77,13 @@ type BudgetSummaryResponse struct {
 }
 
 type TransactionResponse struct {
-	ID              uint      `json:"id"`
-	Description     string    `json:"description"`
-	Amount          int       `json:"amount"`
-	TransactionType int       `json:"transaction_type"`
-	Date            time.Time `json:"date"`
-	CategoryName    string    `json:"category_name"`
-	BankName        string    `json:"bank_name"`
+	ID              uint              `json:"id"`
+	Description     string            `json:"description"`
+	Amount          int               `json:"amount"`
+	TransactionType int               `json:"transaction_type"`
+	Date            utils.CustomTime  `json:"date"`
+	CategoryName    string            `json:"category_name"`
+	BankName        string            `json:"bank_name"`
 }
 
 type YearlyReportResponse struct {

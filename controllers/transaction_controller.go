@@ -219,20 +219,25 @@ func (ctrl *TransactionController) CreateTransaction(c *gin.Context) {
 
     // Parse date - support multiple formats
     dateStr := payload["Date"].(string)
-    var date time.Time
+    var date utils.CustomTime
     var err error
     
-    // Try ISO 8601 format first (2025-12-26T06:54:44.955Z)
-    date, err = time.Parse(time.RFC3339, dateStr)
+    // Try datetime format first (YYYY-MM-DD HH:MM:SS)
+    parsed, err := time.Parse("2006-01-02 15:04:05", dateStr)
     if err != nil {
-        // Try simple date format (2006-01-02)
-        date, err = time.Parse("2006-01-02", dateStr)
+        // Try ISO 8601 format (2025-12-26T06:54:44.955Z)
+        parsed, err = time.Parse(time.RFC3339, dateStr)
         if err != nil {
-            utils.JSONError(c, http.StatusBadRequest, "Invalid date format. Use ISO 8601 or YYYY-MM-DD")
-            return
+            // Try simple date format (2006-01-02)
+            parsed, err = time.Parse("2006-01-02", dateStr)
+            if err != nil {
+                utils.JSONError(c, http.StatusBadRequest, "Invalid date format. Use YYYY-MM-DD HH:MM:SS, ISO 8601 or YYYY-MM-DD")
+                return
+            }
         }
     }
 
+    date.Time = parsed
     transaction.UserID = userIDUint
     transaction.Date   = date
 
@@ -248,4 +253,30 @@ func (ctrl *TransactionController) CreateTransaction(c *gin.Context) {
 
     utils.JSONSuccess(c, "Transaction created successfully", transaction)
 
+}
+func (ctrl *TransactionController) DeleteTransaction(c *gin.Context) {
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+        return
+    }
+
+    userIDUint, ok := userID.(uint)
+    if !ok {
+        utils.JSONError(c, http.StatusInternalServerError, "Invalid user ID")
+        return
+    }
+
+    id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+    if err != nil {
+        utils.JSONError(c, http.StatusBadRequest, "Invalid transaction ID")
+        return
+    }
+
+    if err := ctrl.transactionService.DeleteTransaction(uint(id), userIDUint); err != nil {
+        utils.JSONError(c, http.StatusNotFound, "Transaction not found or unauthorized")
+        return
+    }
+
+    utils.JSONSuccess(c, "Transaction deleted successfully", nil)
 }

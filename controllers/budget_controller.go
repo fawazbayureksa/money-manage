@@ -59,16 +59,20 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 
 	// Parse start_date
 	if startDateStr, ok := payload["start_date"].(string); ok {
-		startDate, err := time.Parse("2006-01-02", startDateStr)
+		parsed, err := time.Parse("2006-01-02 15:04:05", startDateStr)
 		if err != nil {
-			// Try ISO 8601 format
-			startDate, err = time.Parse(time.RFC3339, startDateStr)
+			// Try simple date format
+			parsed, err = time.Parse("2006-01-02", startDateStr)
 			if err != nil {
-				utils.JSONError(c, http.StatusBadRequest, "Invalid start_date format. Use YYYY-MM-DD or ISO 8601")
-				return
+				// Try ISO 8601 format
+				parsed, err = time.Parse(time.RFC3339, startDateStr)
+				if err != nil {
+					utils.JSONError(c, http.StatusBadRequest, "Invalid start_date format. Use YYYY-MM-DD HH:MM:SS, YYYY-MM-DD or ISO 8601")
+					return
+				}
 			}
 		}
-		req.StartDate = startDate
+		req.StartDate = utils.CustomTime{Time: parsed}
 	} else {
 		utils.JSONError(c, http.StatusBadRequest, "start_date is required")
 		return

@@ -411,7 +411,7 @@ func (s *analyticsService) getBudgetSummary(userID uint) dto.BudgetSummaryRespon
 		}
 		totalBudgeted += budget.Amount
 		
-		spent, _ := s.budgetRepo.GetSpentAmount(budget.ID, budget.StartDate, budget.EndDate)
+		spent, _ := s.budgetRepo.GetSpentAmount(budget.ID, budget.StartDate.Time, budget.EndDate.Time)
 		totalSpent += spent
 		
 		percentage := float64(spent) / float64(budget.Amount) * 100

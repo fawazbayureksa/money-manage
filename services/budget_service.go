@@ -6,6 +6,7 @@ import (
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
+	"my-api/utils"
 	"time"
 	"gorm.io/gorm"
 )
@@ -31,10 +32,10 @@ func NewBudgetService(repo repositories.BudgetRepository) BudgetService {
 }
 
 func (s *budgetService) CreateBudget(userID uint, req *dto.CreateBudgetRequest) (*dto.BudgetResponse, error) {
-	endDate := s.calculateEndDate(req.StartDate, req.Period)
+	endDate := s.calculateEndDate(req.StartDate.Time, req.Period)
 
 	// Check for overlapping budgets
-	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate, endDate)
+	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate.Time, endDate.Time)
 	if existing != nil && existing.ID > 0 {
 		return nil, errors.New("budget already exists for this category in the specified period")
 	}
@@ -154,7 +155,7 @@ func (s *budgetService) CheckBudgetAlerts(userID uint) error {
 	}
 
 	for _, budget := range budgets {
-		spent, _ := s.repo.GetSpentAmount(budget.ID, budget.StartDate, budget.EndDate)
+		spent, _ := s.repo.GetSpentAmount(budget.ID, budget.StartDate.Time, budget.EndDate.Time)
 		percentage := float64(spent) / float64(budget.Amount) * 100
 
 		if percentage >= float64(budget.AlertAt) {
@@ -204,7 +205,7 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 			SpentAmount: alert.SpentAmount,
 			Message:     alert.Message,
 			IsRead:      alert.IsRead,
-			CreatedAt:   alert.CreatedAt,
+			CreatedAt:   alert.CreatedAt.Time,
 		}
 		
 		// Include budget and category information if available
@@ -227,15 +228,17 @@ func (s *budgetService) MarkAlertAsRead(alertID uint, userID uint) error {
 }
 
 // Helper functions
-func (s *budgetService) calculateEndDate(startDate time.Time, period string) time.Time {
+func (s *budgetService) calculateEndDate(startDate time.Time, period string) utils.CustomTime {
+	var endDate time.Time
 	switch period {
 	case "monthly":
-		return startDate.AddDate(0, 1, -1)
+		endDate = startDate.AddDate(0, 1, -1)
 	case "yearly":
-		return startDate.AddDate(1, 0, -1)
+		endDate = startDate.AddDate(1, 0, -1)
 	default:
-		return startDate.AddDate(0, 1, -1)
+		endDate = startDate.AddDate(0, 1, -1)
 	}
+	return utils.CustomTime{Time: endDate}
 }
 
 func (s *budgetService) toBudgetResponse(budget *models.Budget) *dto.BudgetResponse {
@@ -261,7 +264,7 @@ func (s *budgetService) toBudgetResponse(budget *models.Budget) *dto.BudgetRespo
 
 func (s *budgetService) toBudgetWithSpendingResponse(budget *models.Budget) *dto.BudgetWithSpendingResponse {
 	baseResponse := s.toBudgetResponse(budget)
-	spent, _ := s.repo.GetSpentAmount(budget.ID, budget.StartDate, budget.EndDate)
+	spent, _ := s.repo.GetSpentAmount(budget.ID, budget.StartDate.Time, budget.EndDate.Time)
 	
 	remaining := budget.Amount - spent
 	percentageUsed := float64(spent) / float64(budget.Amount) * 100

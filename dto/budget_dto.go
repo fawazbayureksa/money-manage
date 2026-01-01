@@ -1,14 +1,17 @@
 package dto
 
-import "time"
+import (
+	"my-api/utils"
+	"time"
+)
 
 type CreateBudgetRequest struct {
-	CategoryID  uint      `json:"category_id" binding:"required"`
-	Amount      int       `json:"amount" binding:"required,min=1"`
-	Period      string    `json:"period" binding:"required,oneof=monthly yearly"`
-	StartDate   time.Time `json:"start_date" binding:"required"`
-	AlertAt     int       `json:"alert_at" binding:"omitempty,min=1,max=100"`
-	Description string    `json:"description" binding:"omitempty,max=500"`
+	CategoryID  uint              `json:"category_id" binding:"required"`
+	Amount      int               `json:"amount" binding:"required,min=1"`
+	Period      string            `json:"period" binding:"required,oneof=monthly yearly"`
+	StartDate   utils.CustomTime  `json:"start_date" binding:"required"`
+	AlertAt     int               `json:"alert_at" binding:"omitempty,min=1,max=100"`
+	Description string            `json:"description" binding:"omitempty,max=500"`
 }
 
 type UpdateBudgetRequest struct {
@@ -19,17 +22,17 @@ type UpdateBudgetRequest struct {
 }
 
 type BudgetResponse struct {
-	ID           uint      `json:"id"`
-	CategoryID   uint      `json:"category_id"`
-	CategoryName string    `json:"category_name"`
-	Amount       int       `json:"amount"`
-	Period       string    `json:"period"`
-	StartDate    time.Time `json:"start_date"`
-	EndDate      time.Time `json:"end_date"`
-	IsActive     bool      `json:"is_active"`
-	AlertAt      int       `json:"alert_at"`
-	Description  string    `json:"description"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID           uint              `json:"id"`
+	CategoryID   uint              `json:"category_id"`
+	CategoryName string            `json:"category_name"`
+	Amount       int               `json:"amount"`
+	Period       string            `json:"period"`
+	StartDate    utils.CustomTime  `json:"start_date"`
+	EndDate      utils.CustomTime  `json:"end_date"`
+	IsActive     bool              `json:"is_active"`
+	AlertAt      int               `json:"alert_at"`
+	Description  string            `json:"description"`
+	CreatedAt    utils.CustomTime  `json:"created_at"`
 }
 
 type BudgetWithSpendingResponse struct {

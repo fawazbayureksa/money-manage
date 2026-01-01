@@ -66,6 +66,7 @@ func SetupRouter(router *gin.Engine) {
 		authorized.GET("/transactions", transactionController.GetTransactions)
 		authorized.GET("/transactions/:id", transactionController.GetTransactionByID)
 		authorized.POST("/transaction", transactionController.CreateTransaction)
+		authorized.DELETE("/transactions/:id", transactionController.DeleteTransaction)
 		
 		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)

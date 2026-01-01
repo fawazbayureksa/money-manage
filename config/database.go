@@ -24,7 +24,7 @@ func ConnectDatabase() {
     dbPass := os.Getenv("DB_PASS")
     dbHost := os.Getenv("DB_HOST")
     dbPort := os.Getenv("DB_PORT")
-
+    fmt.Println("Connecting to database:", dbUser, dbHost, dbPort, dbName,dbPass)
     // Construct the DSN using environment variables
     dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
         dbUser, dbPass, dbHost, dbPort, dbName)
