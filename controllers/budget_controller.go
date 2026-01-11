@@ -243,3 +243,18 @@ func (ctrl *BudgetController) MarkAlertAsRead(c *gin.Context) {
 
 	utils.JSONSuccess(c, "Alert marked as read", nil)
 }
+
+func (ctrl *BudgetController) MarkAllAlertsAsRead(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	if err := ctrl.service.MarkAllAlertsAsRead(userID.(uint)); err != nil {
+		utils.JSONError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONSuccess(c, "All alerts marked as read", nil)
+}

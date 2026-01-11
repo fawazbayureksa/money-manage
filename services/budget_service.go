@@ -21,6 +21,7 @@ type BudgetService interface {
 	CheckBudgetAlerts(userID uint) error
 	GetUserAlerts(userID uint, unreadOnly bool) ([]dto.BudgetAlertResponse, error)
 	MarkAlertAsRead(alertID uint, userID uint) error
+	MarkAllAlertsAsRead(userID uint) error
 }
 
 type budgetService struct {
@@ -225,6 +226,10 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 
 func (s *budgetService) MarkAlertAsRead(alertID uint, userID uint) error {
 	return s.repo.MarkAlertAsRead(alertID, userID)
+}
+
+func (s *budgetService) MarkAllAlertsAsRead(userID uint) error {
+	return s.repo.MarkAllAlertsAsRead(userID)
 }
 
 // Helper functions

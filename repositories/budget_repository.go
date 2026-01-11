@@ -21,6 +21,7 @@ type BudgetRepository interface {
 	CreateAlert(alert *models.BudgetAlert) error
 	GetUserAlerts(userID uint, unreadOnly bool) ([]models.BudgetAlert, error)
 	MarkAlertAsRead(alertID uint, userID uint) error
+	MarkAllAlertsAsRead(userID uint) error
 }
 
 type budgetRepository struct {
@@ -138,5 +139,11 @@ func (r *budgetRepository) GetUserAlerts(userID uint, unreadOnly bool) ([]models
 func (r *budgetRepository) MarkAlertAsRead(alertID uint, userID uint) error {
 	return r.db.Model(&models.BudgetAlert{}).
 		Where("id = ? AND user_id = ?", alertID, userID).
+		Update("is_read", true).Error
+}
+
+func (r *budgetRepository) MarkAllAlertsAsRead(userID uint) error {
+	return r.db.Model(&models.BudgetAlert{}).
+		Where("user_id = ? AND is_read = ?", userID, false).
 		Update("is_read", true).Error
 }
