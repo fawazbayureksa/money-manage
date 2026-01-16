@@ -28,7 +28,7 @@ func (ctrl *AnalyticsController) GetSpendingByCategory(c *gin.Context) {
 
 	var req dto.AnalyticsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
 		return
 	}
 
@@ -50,7 +50,7 @@ func (ctrl *AnalyticsController) GetIncomeVsExpense(c *gin.Context) {
 
 	var req dto.AnalyticsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
 		return
 	}
 
@@ -72,7 +72,7 @@ func (ctrl *AnalyticsController) GetTrendAnalysis(c *gin.Context) {
 
 	var req dto.AnalyticsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
 		return
 	}
 
@@ -94,7 +94,7 @@ func (ctrl *AnalyticsController) GetSpendingByBank(c *gin.Context) {
 
 	var req dto.AnalyticsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
 		return
 	}
 
@@ -197,7 +197,7 @@ func (ctrl *AnalyticsController) GetCategoryTrend(c *gin.Context) {
 
 	var req dto.AnalyticsRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
 		return
 	}
 

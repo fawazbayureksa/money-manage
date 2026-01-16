@@ -1,14 +1,24 @@
 package dto
 
 import (
-	"my-api/utils"
 	"time"
+	"my-api/utils"
 )
 
 type AnalyticsRequest struct {
-	StartDate time.Time `form:"start_date" binding:"required"`
-	EndDate   time.Time `form:"end_date" binding:"required"`
-	GroupBy   string    `form:"group_by" binding:"omitempty,oneof=day week month year"`
+	StartDate string `form:"start_date" binding:"required"`
+	EndDate   string `form:"end_date" binding:"required"`
+	GroupBy   string `form:"group_by" binding:"omitempty,oneof=day week month year"`
+}
+
+// GetStartDate parses and returns the start date
+func (r *AnalyticsRequest) GetStartDate() (time.Time, error) {
+	return time.Parse("2006-01-02", r.StartDate)
+}
+
+// GetEndDate parses and returns the end date
+func (r *AnalyticsRequest) GetEndDate() (time.Time, error) {
+	return time.Parse("2006-01-02", r.EndDate)
 }
 
 type SpendingByCategoryResponse struct {

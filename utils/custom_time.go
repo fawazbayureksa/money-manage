@@ -68,3 +68,29 @@ func (ct *CustomTime) Scan(value interface{}) error {
 		return fmt.Errorf("cannot scan type %T into CustomTime", value)
 	}
 }
+
+// UnmarshalText implements encoding.TextUnmarshaler for form/query parameter binding
+func (ct *CustomTime) UnmarshalText(data []byte) error {
+	str := string(data)
+	if str == "" {
+		ct.Time = time.Time{}
+		return nil
+	}
+
+	// Try date only format first (most common for query params)
+	parsed, err := time.Parse("2006-01-02", str)
+	if err != nil {
+		// Try datetime format
+		parsed, err = time.Parse(DateTimeFormat, str)
+		if err != nil {
+			// Try ISO 8601 format (RFC3339)
+			parsed, err = time.Parse(time.RFC3339, str)
+			if err != nil {
+				return fmt.Errorf("invalid time format: %s", str)
+			}
+		}
+	}
+
+	ct.Time = parsed
+	return nil
+}

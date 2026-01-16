@@ -70,7 +70,16 @@ func toUint(val interface{}) uint {
 }
 
 func (s *analyticsService) GetSpendingByCategory(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByCategoryResponse, error) {
-	results, err := s.analyticsRepo.GetSpendingByCategory(userID, req.StartDate, req.EndDate, 2) // 2 = expense
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+	
+	results, err := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 2) // 2 = expense
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +110,16 @@ func (s *analyticsService) GetSpendingByCategory(userID uint, req *dto.Analytics
 }
 
 func (s *analyticsService) GetIncomeVsExpense(userID uint, req *dto.AnalyticsRequest) (*dto.IncomeVsExpenseResponse, error) {
-	result, err := s.analyticsRepo.GetIncomeVsExpense(userID, req.StartDate, req.EndDate)
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+	
+	result, err := s.analyticsRepo.GetIncomeVsExpense(userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +144,16 @@ func (s *analyticsService) GetIncomeVsExpense(userID uint, req *dto.AnalyticsReq
 }
 
 func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsRequest) (*dto.TrendAnalysisResponse, error) {
-	results, err := s.analyticsRepo.GetMonthlyTrend(userID, req.StartDate, req.EndDate)
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+	
+	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +181,16 @@ func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsReque
 }
 
 func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error) {
-	results, err := s.analyticsRepo.GetSpendingByBank(userID, req.StartDate, req.EndDate)
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+	
+	results, err := s.analyticsRepo.GetSpendingByBank(userID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
@@ -244,15 +280,15 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 
 	// Current month
 	currentReq := &dto.AnalyticsRequest{
-		StartDate: currentMonthStart,
-		EndDate:   currentMonthEnd,
+		StartDate: currentMonthStart.Format("2006-01-02"),
+		EndDate:   currentMonthEnd.Format("2006-01-02"),
 	}
 	currentMonth, _ := s.GetIncomeVsExpense(userID, currentReq)
 
 	// Last month
 	lastReq := &dto.AnalyticsRequest{
-		StartDate: lastMonthStart,
-		EndDate:   lastMonthEnd,
+		StartDate: lastMonthStart.Format("2006-01-02"),
+		EndDate:   lastMonthEnd.Format("2006-01-02"),
 	}
 	lastMonth, _ := s.GetIncomeVsExpense(userID, lastReq)
 
@@ -283,8 +319,8 @@ func (s *analyticsService) GetYearlyReport(userID uint, year int) (*dto.YearlyRe
 	endDate := time.Date(year, 12, 31, 23, 59, 59, 0, time.UTC)
 
 	req := &dto.AnalyticsRequest{
-		StartDate: startDate,
-		EndDate:   endDate,
+		StartDate: startDate.Format("2006-01-02"),
+		EndDate:   endDate.Format("2006-01-02"),
 	}
 
 	summary, _ := s.GetIncomeVsExpense(userID, req)
@@ -308,7 +344,16 @@ func (s *analyticsService) GetYearlyReport(userID uint, year int) (*dto.YearlyRe
 }
 
 func (s *analyticsService) GetCategoryTrend(userID uint, categoryID uint, req *dto.AnalyticsRequest) (*dto.CategoryTrendResponse, error) {
-	results, err := s.analyticsRepo.GetCategoryTrend(userID, categoryID, req.StartDate, req.EndDate)
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+	
+	results, err := s.analyticsRepo.GetCategoryTrend(userID, categoryID, startDate, endDate)
 	if err != nil {
 		return nil, err
 	}
