@@ -20,6 +20,7 @@ type BudgetRepository interface {
 	// Budget Alerts
 	CreateAlert(alert *models.BudgetAlert) error
 	GetUserAlerts(userID uint, unreadOnly bool) ([]models.BudgetAlert, error)
+	GetUserAlertsPaginated(userID uint, filter *dto.AlertFilterRequest) ([]models.BudgetAlert, int64, error)
 	MarkAlertAsRead(alertID uint, userID uint) error
 	MarkAllAlertsAsRead(userID uint) error
 }
@@ -134,6 +135,34 @@ func (r *budgetRepository) GetUserAlerts(userID uint, unreadOnly bool) ([]models
 	
 	err := query.Order("created_at DESC").Find(&alerts).Error
 	return alerts, err
+}
+
+func (r *budgetRepository) GetUserAlertsPaginated(userID uint, filter *dto.AlertFilterRequest) ([]models.BudgetAlert, int64, error) {
+	var alerts []models.BudgetAlert
+	var total int64
+
+	query := r.db.Model(&models.BudgetAlert{}).Where("user_id = ?", userID)
+	
+	if filter.UnreadOnly {
+		query = query.Where("is_read = ?", false)
+	}
+	if filter.BudgetID != 0 {
+		query = query.Where("budget_id = ?", filter.BudgetID)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	sortBy := "created_at"
+	if filter.SortBy != "" {
+		sortBy = filter.SortBy
+	}
+	query = query.Order(sortBy + " " + filter.SortDir)
+	query = query.Offset(filter.GetOffset()).Limit(filter.PageSize)
+
+	err := query.Preload("Budget.Category").Find(&alerts).Error
+	return alerts, total, err
 }
 
 func (r *budgetRepository) MarkAlertAsRead(alertID uint, userID uint) error {

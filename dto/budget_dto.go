@@ -64,3 +64,9 @@ type BudgetAlertResponse struct {
 	CategoryName string    `json:"category_name,omitempty"`
 	BudgetAmount int       `json:"budget_amount,omitempty"`
 }
+
+type AlertFilterRequest struct {
+	PaginationRequest
+	UnreadOnly bool `form:"unread_only"`
+	BudgetID   uint `form:"budget_id"`
+}

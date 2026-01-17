@@ -212,15 +212,19 @@ func (ctrl *BudgetController) GetAlerts(c *gin.Context) {
 		return
 	}
 
-	unreadOnly := c.Query("unread_only") == "true"
+	var filter dto.AlertFilterRequest
+	if err := c.ShouldBindQuery(&filter); err != nil {
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters")
+		return
+	}
 
-	alerts, err := ctrl.service.GetUserAlerts(userID.(uint), unreadOnly)
+	result, err := ctrl.service.GetUserAlertsPaginated(userID.(uint), &filter)
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	utils.JSONSuccess(c, "Alerts retrieved successfully", alerts)
+	utils.JSONSuccess(c, "Alerts retrieved successfully", result)
 }
 
 func (ctrl *BudgetController) MarkAlertAsRead(c *gin.Context) {

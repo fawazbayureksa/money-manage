@@ -20,6 +20,7 @@ type BudgetService interface {
 	GetBudgetStatus(userID uint) ([]dto.BudgetWithSpendingResponse, error)
 	CheckBudgetAlerts(userID uint) error
 	GetUserAlerts(userID uint, unreadOnly bool) ([]dto.BudgetAlertResponse, error)
+	GetUserAlertsPaginated(userID uint, filter *dto.AlertFilterRequest) (*dto.PaginationResponse, error)
 	MarkAlertAsRead(alertID uint, userID uint) error
 	MarkAllAlertsAsRead(userID uint) error
 }
@@ -197,6 +198,22 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 		return nil, err
 	}
 
+	return s.toAlertResponses(alerts), nil
+}
+
+func (s *budgetService) GetUserAlertsPaginated(userID uint, filter *dto.AlertFilterRequest) (*dto.PaginationResponse, error) {
+	filter.SetDefaults()
+
+	alerts, total, err := s.repo.GetUserAlertsPaginated(userID, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	responses := s.toAlertResponses(alerts)
+	return dto.NewPaginationResponse(responses, filter.Page, filter.PageSize, total), nil
+}
+
+func (s *budgetService) toAlertResponses(alerts []models.BudgetAlert) []dto.BudgetAlertResponse {
 	responses := make([]dto.BudgetAlertResponse, len(alerts))
 	for i, alert := range alerts {
 		response := dto.BudgetAlertResponse{
@@ -220,8 +237,7 @@ func (s *budgetService) GetUserAlerts(userID uint, unreadOnly bool) ([]dto.Budge
 		
 		responses[i] = response
 	}
-
-	return responses, nil
+	return responses
 }
 
 func (s *budgetService) MarkAlertAsRead(alertID uint, userID uint) error {
