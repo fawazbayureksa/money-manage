@@ -1,12 +1,12 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
-	"my-api/config"
-	"my-api/controllers"
-	"my-api/middleware"
-	"my-api/repositories"
-	"my-api/services"
+    "github.com/gin-gonic/gin"
+    "my-api/config"
+    "my-api/controllers"
+    "my-api/middleware"
+    "my-api/repositories"
+    "my-api/services"
 )
 
 func SetupRouter(router *gin.Engine) {
@@ -32,8 +32,8 @@ func SetupRouter(router *gin.Engine) {
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
 
-	api := router.Group("/api")
-	{
+    api := router.Group("/api")
+    {
 		// Auth routes
 		api.POST("/register", authController.Register)
 		api.POST("/login", authController.Login)
@@ -49,11 +49,22 @@ func SetupRouter(router *gin.Engine) {
 		api.POST("/banks", bankController.CreateBank)
 		api.DELETE("/banks/:id", bankController.DeleteBank)
 
-		// Category routes
-		api.GET("/categories", controllers.GetCategories)
-		api.GET("/transaction/initial-data", controllers.GetInitialData)
-		api.DELETE("/categories/:id", controllers.DeleteCategory)
-	}
+        // Category routes
+        api.GET("/categories", controllers.GetCategories)
+        api.GET("/transaction/initial-data", controllers.GetInitialData)
+        api.DELETE("/categories/:id", controllers.DeleteCategory)
+        
+        // Wallet routes (wallets)
+        assetRepo := repositories.NewAssetRepository(config.DB)
+        assetService := services.NewAssetService(assetRepo)
+        assetController := controllers.NewAssetController(assetService)
+        api.GET("/wallets", assetController.ListAssets)
+        api.GET("/wallets/:id", assetController.GetAsset)
+        api.POST("/wallets", assetController.CreateAsset)
+        api.PUT("/wallets/:id", assetController.UpdateAsset)
+        api.DELETE("/wallets/:id", assetController.DeleteAsset)
+        api.GET("/wallets/summary", assetController.Summary)
+    }
 
 	// Protected routes
 	authorized := router.Group("/api")
