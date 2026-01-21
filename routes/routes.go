@@ -31,6 +31,9 @@ func SetupRouter(router *gin.Engine) {
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
+	assetRepo := repositories.NewAssetRepository(config.DB)
+	assetService := services.NewAssetService(assetRepo)
+	assetController := controllers.NewAssetController(assetService)
 
     api := router.Group("/api")
     {
@@ -53,17 +56,6 @@ func SetupRouter(router *gin.Engine) {
         api.GET("/categories", controllers.GetCategories)
         api.GET("/transaction/initial-data", controllers.GetInitialData)
         api.DELETE("/categories/:id", controllers.DeleteCategory)
-        
-        // Wallet routes (wallets)
-        assetRepo := repositories.NewAssetRepository(config.DB)
-        assetService := services.NewAssetService(assetRepo)
-        assetController := controllers.NewAssetController(assetService)
-        api.GET("/wallets", assetController.ListAssets)
-        api.GET("/wallets/:id", assetController.GetAsset)
-        api.POST("/wallets", assetController.CreateAsset)
-        api.PUT("/wallets/:id", assetController.UpdateAsset)
-        api.DELETE("/wallets/:id", assetController.DeleteAsset)
-        api.GET("/wallets/summary", assetController.Summary)
     }
 
 	// Protected routes
@@ -82,6 +74,14 @@ func SetupRouter(router *gin.Engine) {
 		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)
 		authorized.POST("/categories", controllers.CreateCategory)
+
+		// Wallet routes (protected)
+		authorized.GET("/wallets", assetController.ListAssets)
+		authorized.GET("/wallets/:id", assetController.GetAsset)
+		authorized.POST("/wallets", assetController.CreateAsset)
+		authorized.PUT("/wallets/:id", assetController.UpdateAsset)
+		authorized.DELETE("/wallets/:id", assetController.DeleteAsset)
+		authorized.GET("/wallets/summary", assetController.Summary)
 
 		// Budget routes
 		authorized.POST("/budgets", budgetController.CreateBudget)

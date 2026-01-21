@@ -45,12 +45,12 @@ func NewAssetService(repo *repositories.AssetRepository) *AssetService {
     return &AssetService{repo: repo}
 }
 
-func (s *AssetService) CreateAsset(userID uint64, dto CreateAssetDTO) (*models.Asset, error) {
+func (s *AssetService) CreateAsset(userID uint, dto CreateAssetDTO) (*models.Asset, error) {
     if err := dto.validate(); err != nil {
         return nil, err
     }
     asset := &models.Asset{
-        UserID:    userID,
+        UserID:    uint64(userID),
         Name:      dto.Name,
         Type:      dto.Type,
         Balance:   dto.Balance,
@@ -64,27 +64,27 @@ func (s *AssetService) CreateAsset(userID uint64, dto CreateAssetDTO) (*models.A
     return asset, nil
 }
 
-func (s *AssetService) ListAssets(userID uint64) ([]models.Asset, error) {
-    return s.repo.GetAssetsByUser(userID)
+func (s *AssetService) ListAssets(userID uint) ([]models.Asset, error) {
+    return s.repo.GetAssetsByUser(uint64(userID))
 }
 
-func (s *AssetService) GetAsset(userID uint64, id uint64) (*models.Asset, error) {
-    asset, err := s.repo.GetAssetByID(id)
+func (s *AssetService) GetAsset(userID uint, id uint) (*models.Asset, error) {
+    asset, err := s.repo.GetAssetByID(uint64(id))
     if err != nil {
         return nil, err
     }
-    if asset.UserID != userID {
+    if asset.UserID != uint64(userID) {
         return nil, errors.New("unauthorized")
     }
     return asset, nil
 }
 
-func (s *AssetService) UpdateAsset(userID uint64, id uint64, dto UpdateAssetDTO) (*models.Asset, error) {
-    asset, err := s.repo.GetAssetByID(id)
+func (s *AssetService) UpdateAsset(userID uint, id uint, dto UpdateAssetDTO) (*models.Asset, error) {
+    asset, err := s.repo.GetAssetByID(uint64(id))
     if err != nil {
         return nil, err
     }
-    if asset.UserID != userID {
+    if asset.UserID != uint64(userID) {
         return nil, errors.New("unauthorized")
     }
     if dto.Name != nil { asset.Name = *dto.Name }
@@ -102,18 +102,18 @@ func (s *AssetService) UpdateAsset(userID uint64, id uint64, dto UpdateAssetDTO)
     return asset, nil
 }
 
-func (s *AssetService) DeleteAsset(userID uint64, id uint64) error {
-    asset, err := s.repo.GetAssetByID(id)
+func (s *AssetService) DeleteAsset(userID uint, id uint) error {
+    asset, err := s.repo.GetAssetByID(uint64(id))
     if err != nil {
         return err
     }
-    if asset.UserID != userID {
+    if asset.UserID != uint64(userID) {
         return errors.New("unauthorized")
     }
-    return s.repo.DeleteAsset(id)
+    return s.repo.DeleteAsset(uint64(id))
 }
 
-func (s *AssetService) Summary(userID uint64) (map[string]float64, error) {
+func (s *AssetService) Summary(userID uint) (map[string]float64, error) {
     assets, err := s.ListAssets(userID)
     if err != nil {
         return nil, err

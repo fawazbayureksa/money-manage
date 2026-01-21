@@ -1,13 +1,12 @@
 package controllers
 
 import (
-    "errors"
     "net/http"
     "strconv"
 
     "github.com/gin-gonic/gin"
-    "my-api/models"
     "my-api/services"
+    "my-api/utils"
 )
 
 type AssetController struct {
@@ -18,154 +17,124 @@ func NewAssetController(service *services.AssetService) *AssetController {
     return &AssetController{service: service}
 }
 
-// Helper to fetch current user id from context
-func getCurrentUserID(c *gin.Context) (uint64, error) {
-    // Primary: userID in context
-    if v, ok := c.Get("userID"); ok {
-        switch val := v.(type) {
-        case uint64:
-            return val, nil
-        case int:
-            return uint64(val), nil
-        case int64:
-            return uint64(val), nil
-        }
-    }
-    // Fallback: common alternative keys
-    if v, ok := c.Get("user_id"); ok {
-        switch val := v.(type) {
-        case uint64:
-            return val, nil
-        case int:
-            return uint64(val), nil
-        case int64:
-            return uint64(val), nil
-        }
-    }
-    // Optional: if a User object is attached to context
-    if v, ok := c.Get("currentUser"); ok {
-        switch u := v.(type) {
-        case *models.User:
-            return uint64(u.ID), nil
-        case models.User:
-            return uint64(u.ID), nil
-        }
-    }
-    if v, ok := c.Get("user"); ok {
-        if u, ok := v.(models.User); ok {
-            return uint64(u.ID), nil
-        }
-    }
-    return 0, errors.New("unauthorized")
-}
-
 func (ac *AssetController) ListAssets(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
-    assets, err := ac.service.ListAssets(userID)
+    
+    assets, err := ac.service.ListAssets(userID.(uint))
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.JSON(http.StatusOK, assets)
+    utils.JSONSuccess(c, "Assets retrieved successfully", assets)
 }
 
 func (ac *AssetController) GetAsset(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
+    
     idParam := c.Param("id")
-    id, err := strconv.ParseUint(idParam, 10, 64)
+    id, err := strconv.ParseUint(idParam, 10, 32)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid asset ID")
         return
     }
-    asset, err := ac.service.GetAsset(userID, id)
+    
+    asset, err := ac.service.GetAsset(userID.(uint), uint(id))
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.JSON(http.StatusOK, asset)
+    utils.JSONSuccess(c, "Asset retrieved successfully", asset)
 }
 
 func (ac *AssetController) CreateAsset(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
+    
     var dto services.CreateAssetDTO
     if err := c.ShouldBindJSON(&dto); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid JSON payload")
         return
     }
-    asset, err := ac.service.CreateAsset(userID, dto)
+    
+    asset, err := ac.service.CreateAsset(userID.(uint), dto)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.JSON(http.StatusCreated, asset)
+    utils.JSONSuccess(c, "Asset created successfully", asset)
 }
 
 func (ac *AssetController) UpdateAsset(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
+    
     idParam := c.Param("id")
-    id, err := strconv.ParseUint(idParam, 10, 64)
+    id, err := strconv.ParseUint(idParam, 10, 32)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid asset ID")
         return
     }
+    
     var dto services.UpdateAssetDTO
     if err := c.ShouldBindJSON(&dto); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid JSON payload")
         return
     }
-    asset, err := ac.service.UpdateAsset(userID, id, dto)
+    
+    asset, err := ac.service.UpdateAsset(userID.(uint), uint(id), dto)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.JSON(http.StatusOK, asset)
+    utils.JSONSuccess(c, "Asset updated successfully", asset)
 }
 
 func (ac *AssetController) DeleteAsset(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
+    
     idParam := c.Param("id")
-    id, err := strconv.ParseUint(idParam, 10, 64)
+    id, err := strconv.ParseUint(idParam, 10, 32)
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+        utils.JSONError(c, http.StatusBadRequest, "Invalid asset ID")
         return
     }
-    if err := ac.service.DeleteAsset(userID, id); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+    
+    if err := ac.service.DeleteAsset(userID.(uint), uint(id)); err != nil {
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.Status(http.StatusNoContent)
+    utils.JSONSuccess(c, "Asset deleted successfully", nil)
 }
 
 func (ac *AssetController) Summary(c *gin.Context) {
-    userID, err := getCurrentUserID(c)
-    if err != nil {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+    userID, exists := c.Get("user_id")
+    if !exists {
+        utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
         return
     }
-    summary, err := ac.service.Summary(userID)
+    
+    summary, err := ac.service.Summary(userID.(uint))
     if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        utils.JSONError(c, http.StatusBadRequest, err.Error())
         return
     }
-    c.JSON(http.StatusOK, summary)
+    utils.JSONSuccess(c, "Summary retrieved successfully", summary)
 }
