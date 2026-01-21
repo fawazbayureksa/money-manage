@@ -1,0 +1,16 @@
+-- Migration: create assets table
+CREATE TABLE assets (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id BIGINT UNSIGNED NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(100),
+  balance DECIMAL(20,8) NOT NULL DEFAULT 0,
+  currency VARCHAR(10) NOT NULL,
+  bank_name VARCHAR(255),
+  account_no VARCHAR(100),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_user_id (user_id),
+  KEY idx_currency (currency)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

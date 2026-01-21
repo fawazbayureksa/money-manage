@@ -1,12 +1,12 @@
 package routes
 
 import (
-	"github.com/gin-gonic/gin"
-	"my-api/config"
-	"my-api/controllers"
-	"my-api/middleware"
-	"my-api/repositories"
-	"my-api/services"
+    "github.com/gin-gonic/gin"
+    "my-api/config"
+    "my-api/controllers"
+    "my-api/middleware"
+    "my-api/repositories"
+    "my-api/services"
 )
 
 func SetupRouter(router *gin.Engine) {
@@ -31,9 +31,12 @@ func SetupRouter(router *gin.Engine) {
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
+	assetRepo := repositories.NewAssetRepository(config.DB)
+	assetService := services.NewAssetService(assetRepo)
+	assetController := controllers.NewAssetController(assetService)
 
-	api := router.Group("/api")
-	{
+    api := router.Group("/api")
+    {
 		// Auth routes
 		api.POST("/register", authController.Register)
 		api.POST("/login", authController.Login)
@@ -49,11 +52,11 @@ func SetupRouter(router *gin.Engine) {
 		api.POST("/banks", bankController.CreateBank)
 		api.DELETE("/banks/:id", bankController.DeleteBank)
 
-		// Category routes
-		api.GET("/categories", controllers.GetCategories)
-		api.GET("/transaction/initial-data", controllers.GetInitialData)
-		api.DELETE("/categories/:id", controllers.DeleteCategory)
-	}
+        // Category routes
+        api.GET("/categories", controllers.GetCategories)
+        api.GET("/transaction/initial-data", controllers.GetInitialData)
+        api.DELETE("/categories/:id", controllers.DeleteCategory)
+    }
 
 	// Protected routes
 	authorized := router.Group("/api")
@@ -71,6 +74,14 @@ func SetupRouter(router *gin.Engine) {
 		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)
 		authorized.POST("/categories", controllers.CreateCategory)
+
+		// Wallet routes (protected)
+		authorized.GET("/wallets", assetController.ListAssets)
+		authorized.GET("/wallets/:id", assetController.GetAsset)
+		authorized.POST("/wallets", assetController.CreateAsset)
+		authorized.PUT("/wallets/:id", assetController.UpdateAsset)
+		authorized.DELETE("/wallets/:id", assetController.DeleteAsset)
+		authorized.GET("/wallets/summary", assetController.Summary)
 
 		// Budget routes
 		authorized.POST("/budgets", budgetController.CreateBudget)
