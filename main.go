@@ -33,5 +33,5 @@ func main() {
     r.Use(CORSMiddleware())
 
     routes.SetupRouter(r)
-    r.Run(":8081")
+    r.Run(":8080")
 }
