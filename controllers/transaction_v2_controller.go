@@ -195,10 +195,11 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	created, _ := ctrl.transactionService.GetTransactionByID(transaction.ID, userIDUint)
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
 		"message": "Transaction created successfully",
-		"data":    transaction,
+		"data":    created,
 	})
 }
 
