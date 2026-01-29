@@ -302,7 +302,6 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 
 	// Recent transactions
 	transactions, _ := s.analyticsRepo.GetRecentTransactions(userID, 10, assetID)
-	3
 
 	// Budget summary
 	budgetSummary := s.getBudgetSummary(userID)
@@ -311,7 +310,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		CurrentMonth:       *currentMonth,
 		LastMonth:          *lastMonth,
 		TopCategories:      topCategories,
-		RecentTransactions: recentTransactions,
+		RecentTransactions: s.toTransactionResponses(transactions),
 		BudgetSummary:      budgetSummary,
 	}, nil
 }
