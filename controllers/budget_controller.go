@@ -1,13 +1,13 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"my-api/dto"
 	"my-api/services"
 	"my-api/utils"
 	"net/http"
 	"strconv"
 	"time"
-	"github.com/gin-gonic/gin"
 )
 
 type BudgetController struct {
@@ -79,6 +79,15 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 	}
 
 	// Optional fields
+	var assetID *uint64
+	if assetIDVal, ok := payload["asset_id"]; ok {
+		if assetIDFloat, ok := assetIDVal.(float64); ok && assetIDFloat > 0 {
+			val := uint64(assetIDFloat)
+			assetID = &val
+		}
+	}
+	req.AssetID = assetID
+
 	if alertAt, ok := payload["alert_at"].(float64); ok {
 		req.AlertAt = int(alertAt)
 	}
