@@ -13,9 +13,9 @@ type AnalyticsService interface {
 	GetIncomeVsExpense(userID uint, req *dto.AnalyticsRequest) (*dto.IncomeVsExpenseResponse, error)
 	GetTrendAnalysis(userID uint, req *dto.AnalyticsRequest) (*dto.TrendAnalysisResponse, error)
 	GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error)
-	GetMonthlyComparison(userID uint, months int) ([]dto.MonthlyComparisonResponse, error)
-	GetDashboardSummary(userID uint, startDate, endDate *time.Time) (*dto.DashboardSummaryResponse, error)
-	GetYearlyReport(userID uint, year int) (*dto.YearlyReportResponse, error)
+	GetMonthlyComparison(userID uint, months int, assetID *uint64) ([]dto.MonthlyComparisonResponse, error)
+	GetDashboardSummary(userID uint, startDate, endDate *time.Time, assetID *uint64) (*dto.DashboardSummaryResponse, error)
+	GetYearlyReport(userID uint, year int, assetID *uint64) (*dto.YearlyReportResponse, error)
 	GetCategoryTrend(userID uint, categoryID uint, req *dto.AnalyticsRequest) (*dto.CategoryTrendResponse, error)
 }
 
@@ -78,8 +78,8 @@ func (s *analyticsService) GetSpendingByCategory(userID uint, req *dto.Analytics
 	if err != nil {
 		return nil, err
 	}
-	
-	results, err := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 2) // 2 = expense
+
+	results, err := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 2, req.AssetID) // 2 = expense
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func (s *analyticsService) GetIncomeVsExpense(userID uint, req *dto.AnalyticsReq
 	if err != nil {
 		return nil, err
 	}
-	
-	result, err := s.analyticsRepo.GetIncomeVsExpense(userID, startDate, endDate)
+
+	result, err := s.analyticsRepo.GetIncomeVsExpense(userID, startDate, endDate, req.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,8 +152,8 @@ func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsReque
 	if err != nil {
 		return nil, err
 	}
-	
-	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate)
+
+	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate, req.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,7 @@ func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsReque
 	for i, result := range results {
 		income := toInt(result["income"])
 		expense := toInt(result["expense"])
-		
+
 		dataPoints[i] = dto.TrendDataPoint{
 			Date:    result["month"].(string),
 			Income:  income,
@@ -189,8 +189,8 @@ func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequ
 	if err != nil {
 		return nil, err
 	}
-	
-	results, err := s.analyticsRepo.GetSpendingByBank(userID, startDate, endDate)
+
+	results, err := s.analyticsRepo.GetSpendingByBank(userID, startDate, endDate, req.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -220,11 +220,11 @@ func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequ
 	return responses, nil
 }
 
-func (s *analyticsService) GetMonthlyComparison(userID uint, months int) ([]dto.MonthlyComparisonResponse, error) {
+func (s *analyticsService) GetMonthlyComparison(userID uint, months int, assetID *uint64) ([]dto.MonthlyComparisonResponse, error) {
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, -months, 0)
 
-	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate)
+	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate, assetID)
 	if err != nil {
 		return nil, err
 	}
@@ -262,10 +262,10 @@ func (s *analyticsService) GetMonthlyComparison(userID uint, months int) ([]dto.
 	return responses, nil
 }
 
-func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *time.Time) (*dto.DashboardSummaryResponse, error) {
+func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *time.Time, assetID *uint64) (*dto.DashboardSummaryResponse, error) {
 	now := time.Now()
 	var currentMonthStart, currentMonthEnd time.Time
-	
+
 	// Use provided dates or default to current month
 	if startDate != nil && endDate != nil {
 		currentMonthStart = *startDate
@@ -274,7 +274,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		currentMonthStart = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 		currentMonthEnd = time.Date(now.Year(), now.Month()+1, 0, 23, 59, 59, 0, now.Location())
 	}
-	
+
 	lastMonthStart := currentMonthStart.AddDate(0, -1, 0)
 	lastMonthEnd := currentMonthStart.AddDate(0, 0, -1)
 
@@ -282,6 +282,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 	currentReq := &dto.AnalyticsRequest{
 		StartDate: currentMonthStart.Format("2006-01-02"),
 		EndDate:   currentMonthEnd.Format("2006-01-02"),
+		AssetID:   assetID,
 	}
 	currentMonth, _ := s.GetIncomeVsExpense(userID, currentReq)
 
@@ -289,6 +290,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 	lastReq := &dto.AnalyticsRequest{
 		StartDate: lastMonthStart.Format("2006-01-02"),
 		EndDate:   lastMonthEnd.Format("2006-01-02"),
+		AssetID:   assetID,
 	}
 	lastMonth, _ := s.GetIncomeVsExpense(userID, lastReq)
 
@@ -299,8 +301,7 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 	}
 
 	// Recent transactions
-	transactions, _ := s.analyticsRepo.GetRecentTransactions(userID, 10)
-	recentTransactions := s.toTransactionResponses(transactions)
+	transactions, _ := s.analyticsRepo.GetRecentTransactions(userID, 10, assetID)
 
 	// Budget summary
 	budgetSummary := s.getBudgetSummary(userID)
@@ -309,25 +310,26 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		CurrentMonth:       *currentMonth,
 		LastMonth:          *lastMonth,
 		TopCategories:      topCategories,
-		RecentTransactions: recentTransactions,
+		RecentTransactions: s.toTransactionResponses(transactions),
 		BudgetSummary:      budgetSummary,
 	}, nil
 }
 
-func (s *analyticsService) GetYearlyReport(userID uint, year int) (*dto.YearlyReportResponse, error) {
+func (s *analyticsService) GetYearlyReport(userID uint, year int, assetID *uint64) (*dto.YearlyReportResponse, error) {
 	startDate := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(year, 12, 31, 23, 59, 59, 0, time.UTC)
 
 	req := &dto.AnalyticsRequest{
 		StartDate: startDate.Format("2006-01-02"),
 		EndDate:   endDate.Format("2006-01-02"),
+		AssetID:   assetID,
 	}
 
 	summary, _ := s.GetIncomeVsExpense(userID, req)
-	monthlyBreakdown, _ := s.GetMonthlyComparison(userID, 12)
-	
-	expenseCategories, _ := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 2)
-	incomeCategories, _ := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 1)
+	monthlyBreakdown, _ := s.GetMonthlyComparison(userID, 12, assetID)
+
+	expenseCategories, _ := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 2, assetID)
+	incomeCategories, _ := s.analyticsRepo.GetSpendingByCategory(userID, startDate, endDate, 1, assetID)
 
 	topExpense := s.toSpendingByCategoryResponses(expenseCategories, 10)
 	topIncome := s.toSpendingByCategoryResponses(incomeCategories, 10)
@@ -352,19 +354,19 @@ func (s *analyticsService) GetCategoryTrend(userID uint, categoryID uint, req *d
 	if err != nil {
 		return nil, err
 	}
-	
-	results, err := s.analyticsRepo.GetCategoryTrend(userID, categoryID, startDate, endDate)
+
+	results, err := s.analyticsRepo.GetCategoryTrend(userID, categoryID, startDate, endDate, req.AssetID)
 	if err != nil {
 		return nil, err
 	}
 
 	dataPoints := make([]dto.TrendDataPoint, len(results))
 	var totalAmount int
-	
+
 	for i, result := range results {
 		amount := toInt(result["amount"])
 		totalAmount += amount
-		
+
 		dataPoints[i] = dto.TrendDataPoint{
 			Date:    result["date"].(string),
 			Expense: amount,
@@ -386,16 +388,20 @@ func (s *analyticsService) GetCategoryTrend(userID uint, categoryID uint, req *d
 }
 
 // Helper functions
-func (s *analyticsService) toTransactionResponses(transactions []models.Transaction) []dto.TransactionResponse {
+func (s *analyticsService) toTransactionResponses(transactions []models.TransactionV2) []dto.TransactionResponse {
 	responses := make([]dto.TransactionResponse, len(transactions))
 	for i, t := range transactions {
 		categoryName := ""
 		bankName := ""
+		assetName := ""
 		if t.Category.ID > 0 {
 			categoryName = t.Category.CategoryName
 		}
 		if t.Bank.ID > 0 {
 			bankName = t.Bank.BankName
+		}
+		if t.Asset.ID > 0 {
+			assetName = t.Asset.Name
 		}
 
 		responses[i] = dto.TransactionResponse{
@@ -406,6 +412,7 @@ func (s *analyticsService) toTransactionResponses(transactions []models.Transact
 			Date:            t.Date,
 			CategoryName:    categoryName,
 			BankName:        bankName,
+			AssetName:       assetName,
 		}
 	}
 	return responses
@@ -443,7 +450,7 @@ func (s *analyticsService) toSpendingByCategoryResponses(results []map[string]in
 
 func (s *analyticsService) getBudgetSummary(userID uint) dto.BudgetSummaryResponse {
 	budgets, _ := s.budgetRepo.FindActiveBudgets(userID)
-	
+
 	totalBudgeted := 0
 	totalSpent := 0
 	exceededCount := 0
@@ -455,10 +462,10 @@ func (s *analyticsService) getBudgetSummary(userID uint) dto.BudgetSummaryRespon
 			activeCount++
 		}
 		totalBudgeted += budget.Amount
-		
+
 		spent, _ := s.budgetRepo.GetSpentAmount(budget.ID, budget.StartDate.Time, budget.EndDate.Time)
 		totalSpent += spent
-		
+
 		percentage := float64(spent) / float64(budget.Amount) * 100
 		if percentage >= 100 {
 			exceededCount++

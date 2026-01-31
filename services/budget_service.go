@@ -3,12 +3,12 @@ package services
 import (
 	"errors"
 	"fmt"
+	"gorm.io/gorm"
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
 	"my-api/utils"
 	"time"
-	"gorm.io/gorm"
 )
 
 type BudgetService interface {
@@ -37,7 +37,7 @@ func (s *budgetService) CreateBudget(userID uint, req *dto.CreateBudgetRequest) 
 	endDate := s.calculateEndDate(req.StartDate.Time, req.Period)
 
 	// Check for overlapping budgets
-	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate.Time, endDate.Time)
+	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate.Time, endDate.Time, nil)
 	if existing != nil && existing.ID > 0 {
 		return nil, errors.New("budget already exists for this category in the specified period")
 	}
@@ -225,7 +225,7 @@ func (s *budgetService) toAlertResponses(alerts []models.BudgetAlert) []dto.Budg
 			IsRead:      alert.IsRead,
 			CreatedAt:   alert.CreatedAt.Time,
 		}
-		
+
 		// Include budget and category information if available
 		if alert.Budget.ID > 0 {
 			response.CategoryID = alert.Budget.CategoryID
@@ -234,7 +234,7 @@ func (s *budgetService) toAlertResponses(alerts []models.BudgetAlert) []dto.Budg
 				response.CategoryName = alert.Budget.Category.CategoryName
 			}
 		}
-		
+
 		responses[i] = response
 	}
 	return responses
@@ -286,10 +286,10 @@ func (s *budgetService) toBudgetResponse(budget *models.Budget) *dto.BudgetRespo
 func (s *budgetService) toBudgetWithSpendingResponse(budget *models.Budget) *dto.BudgetWithSpendingResponse {
 	baseResponse := s.toBudgetResponse(budget)
 	spent, _ := s.repo.GetSpentAmount(budget.ID, budget.StartDate.Time, budget.EndDate.Time)
-	
+
 	remaining := budget.Amount - spent
 	percentageUsed := float64(spent) / float64(budget.Amount) * 100
-	
+
 	status := "safe"
 	if percentageUsed >= 100 {
 		status = "exceeded"
