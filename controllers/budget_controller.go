@@ -43,10 +43,21 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 		return
 	}
 
-	if amount, ok := payload["amount"].(float64); ok {
-		req.Amount = int(amount)
-	} else {
+	amountVal, ok := payload["amount"]
+	if !ok {
 		utils.JSONError(c, http.StatusBadRequest, "amount is required")
+		return
+	}
+
+	switch v := amountVal.(type) {
+	case float64:
+		req.Amount = int(v)
+	case int:
+		req.Amount = v
+	case int64:
+		req.Amount = int(v)
+	default:
+		utils.JSONError(c, http.StatusBadRequest, "amount must be a number")
 		return
 	}
 
@@ -77,16 +88,6 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 		utils.JSONError(c, http.StatusBadRequest, "start_date is required")
 		return
 	}
-
-	// Optional fields
-	var assetID *uint64
-	if assetIDVal, ok := payload["asset_id"]; ok {
-		if assetIDFloat, ok := assetIDVal.(float64); ok && assetIDFloat > 0 {
-			val := uint64(assetIDFloat)
-			assetID = &val
-		}
-	}
-	req.AssetID = assetID
 
 	if alertAt, ok := payload["alert_at"].(float64); ok {
 		req.AlertAt = int(alertAt)

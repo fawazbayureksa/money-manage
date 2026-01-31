@@ -39,7 +39,7 @@ func (r *budgetRepository) Create(budget *models.Budget) error {
 
 func (r *budgetRepository) FindByID(id uint, userID uint) (*models.Budget, error) {
 	var budget models.Budget
-	err := r.db.Preload("Category").Preload("Asset").
+	err := r.db.Preload("Category").
 		Where("id = ? AND user_id = ?", id, userID).
 		First(&budget).Error
 	return &budget, err
@@ -53,13 +53,6 @@ func (r *budgetRepository) FindAll(userID uint, filter *dto.BudgetFilterRequest)
 
 	if filter.CategoryID != 0 {
 		query = query.Where("category_id = ?", filter.CategoryID)
-	}
-	if filter.AssetID != nil {
-		if *filter.AssetID == 0 {
-			query = query.Where("asset_id IS NULL")
-		} else {
-			query = query.Where("asset_id = ?", *filter.AssetID)
-		}
 	}
 	if filter.Period != "" {
 		query = query.Where("period = ?", filter.Period)
@@ -82,7 +75,7 @@ func (r *budgetRepository) FindAll(userID uint, filter *dto.BudgetFilterRequest)
 	query = query.Order(sortBy + " " + filter.SortDir)
 	query = query.Offset(filter.GetOffset()).Limit(filter.PageSize)
 
-	err := query.Preload("Category").Preload("Asset").Find(&budgets).Error
+	err := query.Preload("Category").Find(&budgets).Error
 	return budgets, total, err
 }
 
@@ -97,7 +90,7 @@ func (r *budgetRepository) Delete(id uint, userID uint) error {
 func (r *budgetRepository) FindActiveBudgets(userID uint) ([]models.Budget, error) {
 	var budgets []models.Budget
 	now := time.Now()
-	err := r.db.Preload("Category").Preload("Asset").
+	err := r.db.Preload("Category").
 		Where("user_id = ? AND is_active = ? AND start_date <= ? AND end_date >= ?",
 			userID, true, now, now).
 		Find(&budgets).Error
@@ -111,35 +104,19 @@ func (r *budgetRepository) GetSpentAmount(budgetID uint, startDate, endDate time
 	}
 
 	var total int64
-	query := r.db.Model(&models.TransactionV2{}).
+	err := r.db.Model(&models.TransactionV2{}).
 		Where("user_id = ? AND category_id = ? AND transaction_type = ? AND date BETWEEN ? AND ?",
-			budget.UserID, budget.CategoryID, 2, startDate, endDate)
-
-	// Filter by asset if budget is asset-specific
-	if budget.AssetID != nil && *budget.AssetID > 0 {
-		query = query.Where("asset_id = ?", *budget.AssetID)
-	}
-
-	err := query.Select("COALESCE(SUM(amount), 0)").Scan(&total).Error
+			budget.UserID, budget.CategoryID, 2, startDate, endDate).
+		Select("COALESCE(SUM(amount), 0)").
+		Scan(&total).Error
 
 	return int(total), err
 }
 
 func (r *budgetRepository) FindBudgetByCategory(userID, categoryID uint, startDate, endDate time.Time, assetID *uint64) (*models.Budget, error) {
 	var budget models.Budget
-	query := r.db.Where("user_id = ? AND category_id = ? AND start_date <= ? AND end_date >= ?",
-		userID, categoryID, endDate, startDate)
-
-	// If both assetID and the budget's AssetID are set, they must match
-	// If assetID is nil or 0, we're looking for a global budget
-	// If assetID is set, we're looking for an asset-specific budget
-	if assetID != nil && *assetID > 0 {
-		query = query.Where("(asset_id = ? OR asset_id IS NULL)", *assetID)
-	} else {
-		query = query.Where("asset_id IS NULL")
-	}
-
-	err := query.First(&budget).Error
+	err := r.db.Where("user_id = ? AND category_id = ? AND start_date <= ? AND end_date >= ?",
+		userID, categoryID, endDate, startDate).First(&budget).Error
 	return &budget, err
 }
 

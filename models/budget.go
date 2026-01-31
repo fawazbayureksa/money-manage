@@ -8,7 +8,6 @@ type Budget struct {
 	ID          uint             `gorm:"primaryKey;autoIncrement;type:int unsigned" json:"id"`
 	UserID      uint             `gorm:"not null;index;type:int unsigned" json:"user_id"`
 	CategoryID  uint             `gorm:"not null;index;type:int unsigned" json:"category_id"`
-	AssetID     *uint64          `gorm:"index;type:bigint unsigned" json:"asset_id"` // nil = all assets
 	Amount      int              `gorm:"not null" json:"amount"`
 	Period      string           `gorm:"size:20;not null" json:"period"` // monthly, yearly
 	StartDate   utils.CustomTime `gorm:"not null;type:datetime" json:"start_date"`
@@ -22,7 +21,6 @@ type Budget struct {
 	// Relations
 	User     User     `gorm:"foreignKey:UserID" json:"-"`
 	Category Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Asset    Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
 }
 
 type BudgetAlert struct {

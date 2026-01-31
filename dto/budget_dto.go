@@ -7,7 +7,6 @@ import (
 
 type CreateBudgetRequest struct {
 	CategoryID  uint             `json:"category_id" binding:"required"`
-	AssetID     *uint64          `json:"asset_id" binding:"omitempty"` // nil = all assets
 	Amount      int              `json:"amount" binding:"required,min=1"`
 	Period      string           `json:"period" binding:"required,oneof=monthly yearly"`
 	StartDate   utils.CustomTime `json:"start_date" binding:"required"`
@@ -26,8 +25,6 @@ type BudgetResponse struct {
 	ID           uint             `json:"id"`
 	CategoryID   uint             `json:"category_id"`
 	CategoryName string           `json:"category_name"`
-	AssetID      *uint64          `json:"asset_id"`
-	AssetName    string           `json:"asset_name"`
 	Amount       int              `json:"amount"`
 	Period       string           `json:"period"`
 	StartDate    utils.CustomTime `json:"start_date"`
@@ -49,11 +46,10 @@ type BudgetWithSpendingResponse struct {
 
 type BudgetFilterRequest struct {
 	PaginationRequest
-	CategoryID uint    `form:"category_id"`
-	AssetID    *uint64 `form:"asset_id"`
-	Period     string  `form:"period"`
-	IsActive   *bool   `form:"is_active"`
-	Status     string  `form:"status"` // all, active, exceeded, warning
+	CategoryID uint   `form:"category_id"`
+	Period     string `form:"period"`
+	IsActive   *bool  `form:"is_active"`
+	Status     string `form:"status"` // all, active, exceeded, warning
 }
 
 type BudgetAlertResponse struct {

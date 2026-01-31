@@ -37,7 +37,7 @@ func (s *budgetService) CreateBudget(userID uint, req *dto.CreateBudgetRequest) 
 	endDate := s.calculateEndDate(req.StartDate.Time, req.Period)
 
 	// Check for overlapping budgets
-	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate.Time, endDate.Time, req.AssetID)
+	existing, _ := s.repo.FindBudgetByCategory(userID, req.CategoryID, req.StartDate.Time, endDate.Time, nil)
 	if existing != nil && existing.ID > 0 {
 		return nil, errors.New("budget already exists for this category in the specified period")
 	}
@@ -50,7 +50,6 @@ func (s *budgetService) CreateBudget(userID uint, req *dto.CreateBudgetRequest) 
 	budget := &models.Budget{
 		UserID:      userID,
 		CategoryID:  req.CategoryID,
-		AssetID:     req.AssetID,
 		Amount:      req.Amount,
 		Period:      req.Period,
 		StartDate:   req.StartDate,
@@ -269,17 +268,10 @@ func (s *budgetService) toBudgetResponse(budget *models.Budget) *dto.BudgetRespo
 		categoryName = budget.Category.CategoryName
 	}
 
-	assetName := ""
-	if budget.Asset.ID > 0 {
-		assetName = budget.Asset.Name
-	}
-
 	return &dto.BudgetResponse{
 		ID:           budget.ID,
 		CategoryID:   budget.CategoryID,
 		CategoryName: categoryName,
-		AssetID:      budget.AssetID,
-		AssetName:    assetName,
 		Amount:       budget.Amount,
 		Period:       budget.Period,
 		StartDate:    budget.StartDate,
