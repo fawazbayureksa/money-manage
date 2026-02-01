@@ -6,7 +6,7 @@ import (
     "time"
 
     "my-api/config"
-    "my-api/models"
+    // "my-api/models"
     "my-api/routes"
     "my-api/utils"
 
@@ -67,10 +67,7 @@ func main() {
     utils.LogInfo("Starting Money Manage API...")
 
     config.ConnectDatabase()
-    utils.LogInfo("Database connected successfully")
-
-    models.AutoMigrate()
-    utils.LogInfo("Database migrations completed")
+    // models.AutoMigrate()
 
     r := gin.Default()
 
