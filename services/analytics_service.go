@@ -222,7 +222,7 @@ func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequ
 
 func (s *analyticsService) GetMonthlyComparison(userID uint, months int, assetID *uint64) ([]dto.MonthlyComparisonResponse, error) {
 	endDate := time.Now()
-	startDate := endDate.AddDate(0, -months, 0)
+	startDate := endDate.AddDate(0, -months, -1)
 
 	results, err := s.analyticsRepo.GetMonthlyTrend(userID, startDate, endDate, assetID)
 	if err != nil {
