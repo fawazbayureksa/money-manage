@@ -18,6 +18,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionRepo := repositories.NewTransactionRepository(config.DB)
 	assetRepo := repositories.NewAssetRepository(config.DB)
 	transactionV2Repo := repositories.NewTransactionV2Repository(config.DB)
+	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -27,16 +28,18 @@ func SetupRouter(router *gin.Engine) {
 	transactionService := services.NewTransactionService(transactionRepo)
 	assetService := services.NewAssetService(assetRepo)
 	transactionV2Service := services.NewTransactionV2Service(transactionV2Repo, assetRepo)
+	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
 	userController := controllers.NewUserController(userService)
 	bankController := controllers.NewBankController(bankService)
 	budgetController := controllers.NewBudgetController(budgetService)
-	analyticsController := controllers.NewAnalyticsController(analyticsService)
+	analyticsController := controllers.NewAnalyticsController(analyticsService, userSettingsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
 	transactionV2Controller := controllers.NewTransactionV2Controller(transactionV2Service, budgetService)
 	assetController := controllers.NewAssetController(assetService)
+	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
 
 	api := router.Group("/api")
 	{
@@ -118,5 +121,11 @@ func SetupRouter(router *gin.Engine) {
 		authorized.GET("/analytics/monthly-comparison", analyticsController.GetMonthlyComparison)
 		authorized.GET("/analytics/yearly-report", analyticsController.GetYearlyReport)
 		authorized.GET("/analytics/category-trend/:category_id", analyticsController.GetCategoryTrend)
+
+		// User Settings routes (Pay Cycle Configuration)
+		authorized.GET("/user/settings", userSettingsController.GetUserSettings)
+		authorized.POST("/user/settings", userSettingsController.CreateUserSettings)
+		authorized.PUT("/user/settings", userSettingsController.UpdateUserSettings)
+		authorized.DELETE("/user/settings", userSettingsController.DeleteUserSettings)
 	}
 }

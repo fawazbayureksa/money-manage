@@ -12,6 +12,7 @@ type AnalyticsService interface {
 	GetSpendingByCategory(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByCategoryResponse, error)
 	GetIncomeVsExpense(userID uint, req *dto.AnalyticsRequest) (*dto.IncomeVsExpenseResponse, error)
 	GetTrendAnalysis(userID uint, req *dto.AnalyticsRequest) (*dto.TrendAnalysisResponse, error)
+	GetTrendAnalysisWithPayCycle(userID uint, req *dto.AnalyticsRequest, settings *models.UserSettings) (*dto.TrendAnalysisResponse, error)
 	GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error)
 	GetSpendingByAsset(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByAssetResponse, error)
 	GetMonthlyComparison(userID uint, months int, assetID *uint64) ([]dto.MonthlyComparisonResponse, error)
@@ -198,6 +199,50 @@ func (s *analyticsService) GetTrendAnalysis(userID uint, req *dto.AnalyticsReque
 		Summary:    *summary,
 	}, nil
 }
+
+func (s *analyticsService) GetTrendAnalysisWithPayCycle(userID uint, req *dto.AnalyticsRequest, settings *models.UserSettings) (*dto.TrendAnalysisResponse, error) {
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := s.analyticsRepo.GetMonthlyTrendByPayCycle(userID, startDate, endDate, req.AssetID, settings)
+	if err != nil {
+		return nil, err
+	}
+
+	dataPoints := make([]dto.TrendDataPoint, len(results))
+	for i, result := range results {
+		income := toInt(result["income"])
+		expense := toInt(result["expense"])
+
+		// Use period label for date
+		dateStr := result["period"].(string)
+		if periodStart, ok := result["period_start"].(string); ok {
+			dateStr = periodStart // Use period start for better display
+		}
+
+		dataPoints[i] = dto.TrendDataPoint{
+			Date:    dateStr,
+			Income:  income,
+			Expense: expense,
+			Net:     income - expense,
+		}
+	}
+
+	summary, _ := s.GetIncomeVsExpense(userID, req)
+
+	return &dto.TrendAnalysisResponse{
+		Period:     "pay_cycle",
+		DataPoints: dataPoints,
+		Summary:    *summary,
+	}, nil
+}
+
 
 func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error) {
 	startDate, err := req.GetStartDate()

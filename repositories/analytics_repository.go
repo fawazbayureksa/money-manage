@@ -3,6 +3,7 @@ package repositories
 import (
 	"gorm.io/gorm"
 	"my-api/models"
+	"my-api/utils"
 	"time"
 )
 
@@ -13,6 +14,7 @@ type AnalyticsRepository interface {
 	GetSpendingByAsset(userID uint, startDate, endDate time.Time) ([]map[string]interface{}, error)
 	GetIncomeVsExpense(userID uint, startDate, endDate time.Time, assetID *uint64) (map[string]interface{}, error)
 	GetMonthlyTrend(userID uint, startDate, endDate time.Time, assetID *uint64) ([]map[string]interface{}, error)
+	GetMonthlyTrendByPayCycle(userID uint, startDate, endDate time.Time, assetID *uint64, settings *models.UserSettings) ([]map[string]interface{}, error)
 	GetRecentTransactions(userID uint, limit int, assetID *uint64) ([]models.TransactionV2, error)
 	GetCategoryTrend(userID uint, categoryID uint, startDate, endDate time.Time, assetID *uint64) ([]map[string]interface{}, error)
 }
@@ -192,4 +194,45 @@ func (r *analyticsRepository) GetCategoryTrend(userID uint, categoryID uint, sta
 	err := r.db.Raw(query, args...).Scan(&results).Error
 
 	return results, err
+}
+
+// GetMonthlyTrendByPayCycle returns monthly trends based on user's financial periods
+func (r *analyticsRepository) GetMonthlyTrendByPayCycle(userID uint, startDate, endDate time.Time, assetID *uint64, settings *models.UserSettings) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
+
+	// Get all financial periods in the date range
+	periods := utils.GetFinancialPeriods(settings, startDate, endDate)
+
+	// Query transactions for each period
+	for _, period := range periods {
+		var income, expense int64
+
+		// Get income for this period
+		queryIncome := r.db.Model(&models.TransactionV2{}).
+			Where("user_id = ? AND transaction_type = ? AND date BETWEEN ? AND ? AND category_id != ?",
+				userID, 1, period.StartDate, period.EndDate, 18)
+		if assetID != nil {
+			queryIncome = queryIncome.Where("asset_id = ?", *assetID)
+		}
+		queryIncome.Select("COALESCE(SUM(amount), 0)").Scan(&income)
+
+		// Get expense for this period
+		queryExpense := r.db.Model(&models.TransactionV2{}).
+			Where("user_id = ? AND transaction_type = ? AND date BETWEEN ? AND ? AND category_id != ?",
+				userID, 2, period.StartDate, period.EndDate, 18)
+		if assetID != nil {
+			queryExpense = queryExpense.Where("asset_id = ?", *assetID)
+		}
+		queryExpense.Select("COALESCE(SUM(amount), 0)").Scan(&expense)
+
+		results = append(results, map[string]interface{}{
+			"period":       period.PeriodLabel,
+			"period_start": period.StartDate.Format("2006-01-02"),
+			"period_end":   period.EndDate.Format("2006-01-02"),
+			"income":       income,
+			"expense":      expense,
+		})
+	}
+
+	return results, nil
 }
