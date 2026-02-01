@@ -140,10 +140,10 @@ func (r *analyticsRepository) GetMonthlyTrend(userID uint, startDate, endDate ti
 		SUM(CASE WHEN transaction_type = 1 THEN amount ELSE 0 END) as income,
 		SUM(CASE WHEN transaction_type = 2 THEN amount ELSE 0 END) as expense
 	FROM transactions
-	WHERE user_id = ? AND date BETWEEN ? AND ?`
+	WHERE user_id = ? AND date BETWEEN ? AND ? AND category_id != ?`
 
 	var args []interface{}
-	args = append(args, userID, startDate, endDate)
+	args = append(args, userID, startDate, endDate,18)
 
 	if assetID != nil {
 		query += ` AND asset_id = ?`
