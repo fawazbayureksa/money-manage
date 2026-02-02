@@ -6,19 +6,28 @@ import (
 )
 
 type AnalyticsRequest struct {
-	StartDate string  `form:"start_date" binding:"required"`
-	EndDate   string  `form:"end_date" binding:"required"`
+	StartDate string  `form:"start_date" binding:"omitempty"`
+	EndDate   string  `form:"end_date" binding:"omitempty"`
 	GroupBy   string  `form:"group_by" binding:"omitempty,oneof=day week month year"`
 	AssetID   *uint64 `form:"asset_id" binding:"omitempty"`
 }
 
-// GetStartDate parses and returns the start date
+// GetStartDate parses and returns the start date, defaults to first day of current month
 func (r *AnalyticsRequest) GetStartDate() (time.Time, error) {
+	if r.StartDate == "" {
+		// Default to first day of current month
+		now := time.Now()
+		return time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()), nil
+	}
 	return time.Parse("2006-01-02", r.StartDate)
 }
 
-// GetEndDate parses and returns the end date
+// GetEndDate parses and returns the end date, defaults to current date
 func (r *AnalyticsRequest) GetEndDate() (time.Time, error) {
+	if r.EndDate == "" {
+		// Default to current date
+		return time.Now(), nil
+	}
 	return time.Parse("2006-01-02", r.EndDate)
 }
 
