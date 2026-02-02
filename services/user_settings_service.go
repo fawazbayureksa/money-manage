@@ -29,13 +29,8 @@ func (s *userSettingsService) GetUserSettings(userID uint) (*dto.UserSettingsRes
 	settings, err := s.repo.FindByUserID(userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// Return default settings if not found
-			return &dto.UserSettingsResponse{
-				UserID:           userID,
-				PayCycleType:     models.PayCycleCalendar,
-				PayDay:           nil,
-				CycleStartOffset: 1,
-			}, nil
+			// Return nil if not found
+			return nil, nil
 		}
 		return nil, err
 	}

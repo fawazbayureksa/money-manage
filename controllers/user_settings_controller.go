@@ -39,6 +39,11 @@ func (ctrl *UserSettingsController) GetUserSettings(c *gin.Context) {
 		return
 	}
 
+	if settings == nil {
+		utils.JSONSuccess(c, "No user settings found", nil)
+		return
+	}
+
 	utils.JSONSuccess(c, "User settings retrieved successfully", settings)
 }
 
