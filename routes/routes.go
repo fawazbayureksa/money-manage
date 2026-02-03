@@ -112,6 +112,7 @@ func SetupRouter(router *gin.Engine) {
 		authorized.GET("/analytics/dashboard", analyticsController.GetDashboardSummary)
 		authorized.GET("/analytics/spending-by-category", analyticsController.GetSpendingByCategory)
 		authorized.GET("/analytics/spending-by-bank", analyticsController.GetSpendingByBank)
+		authorized.GET("/analytics/spending-by-asset", analyticsController.GetSpendingByAsset)
 		authorized.GET("/analytics/income-vs-expense", analyticsController.GetIncomeVsExpense)
 		authorized.GET("/analytics/trend", analyticsController.GetTrendAnalysis)
 		authorized.GET("/analytics/monthly-comparison", analyticsController.GetMonthlyComparison)

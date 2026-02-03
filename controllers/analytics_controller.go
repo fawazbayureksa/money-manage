@@ -107,6 +107,28 @@ func (ctrl *AnalyticsController) GetSpendingByBank(c *gin.Context) {
 	utils.JSONSuccess(c, "Spending by bank retrieved successfully", result)
 }
 
+func (ctrl *AnalyticsController) GetSpendingByAsset(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req dto.AnalyticsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
+		return
+	}
+
+	result, err := ctrl.service.GetSpendingByAsset(userID.(uint), &req)
+	if err != nil {
+		utils.JSONError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONSuccess(c, "Spending by asset retrieved successfully", result)
+}
+
 func (ctrl *AnalyticsController) GetMonthlyComparison(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {

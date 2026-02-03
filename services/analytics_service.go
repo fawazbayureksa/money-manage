@@ -13,6 +13,7 @@ type AnalyticsService interface {
 	GetIncomeVsExpense(userID uint, req *dto.AnalyticsRequest) (*dto.IncomeVsExpenseResponse, error)
 	GetTrendAnalysis(userID uint, req *dto.AnalyticsRequest) (*dto.TrendAnalysisResponse, error)
 	GetSpendingByBank(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByBankResponse, error)
+	GetSpendingByAsset(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByAssetResponse, error)
 	GetMonthlyComparison(userID uint, months int, assetID *uint64) ([]dto.MonthlyComparisonResponse, error)
 	GetDashboardSummary(userID uint, startDate, endDate *time.Time, assetID *uint64) (*dto.DashboardSummaryResponse, error)
 	GetYearlyReport(userID uint, year int, assetID *uint64) (*dto.YearlyReportResponse, error)
@@ -64,6 +65,24 @@ func toUint(val interface{}) uint {
 		return uint(v)
 	case float64:
 		return uint(v)
+	default:
+		return 0
+	}
+}
+
+// Helper function to safely convert interface{} to uint64
+func toUint64(val interface{}) uint64 {
+	switch v := val.(type) {
+	case uint64:
+		return v
+	case uint:
+		return uint64(v)
+	case int:
+		return uint64(v)
+	case int64:
+		return uint64(v)
+	case float64:
+		return uint64(v)
 	default:
 		return 0
 	}
@@ -214,6 +233,52 @@ func (s *analyticsService) GetSpendingByBank(userID uint, req *dto.AnalyticsRequ
 			TotalAmount: amount,
 			Percentage:  percentage,
 			Count:       toInt(result["count"]),
+		}
+	}
+
+	return responses, nil
+}
+
+// GetSpendingByAsset returns spending grouped by asset/wallet
+func (s *analyticsService) GetSpendingByAsset(userID uint, req *dto.AnalyticsRequest) ([]dto.SpendingByAssetResponse, error) {
+	startDate, err := req.GetStartDate()
+	if err != nil {
+		return nil, err
+	}
+	endDate, err := req.GetEndDate()
+	if err != nil {
+		return nil, err
+	}
+
+	results, err := s.analyticsRepo.GetSpendingByAsset(userID, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	var totalExpense int64
+	for _, result := range results {
+		totalExpense += int64(toInt(result["total_expense"]))
+	}
+
+	responses := make([]dto.SpendingByAssetResponse, len(results))
+	for i, result := range results {
+		income := toInt(result["total_income"])
+		expense := toInt(result["total_expense"])
+		percentage := float64(0)
+		if totalExpense > 0 {
+			percentage = float64(expense) / float64(totalExpense) * 100
+		}
+
+		responses[i] = dto.SpendingByAssetResponse{
+			AssetID:           toUint64(result["asset_id"]),
+			AssetName:         result["asset_name"].(string),
+			AssetType:         result["asset_type"].(string),
+			AssetCurrency:     result["asset_currency"].(string),
+			TotalIncome:       income,
+			TotalExpense:      expense,
+			NetAmount:         income - expense,
+			Percentage:        percentage,
+			TransactionCount:  toInt(result["transaction_count"]),
 		}
 	}
 
