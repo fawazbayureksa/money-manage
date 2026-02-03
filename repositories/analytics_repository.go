@@ -10,6 +10,7 @@ type AnalyticsRepository interface {
 	GetTransactionsByDateRange(userID uint, startDate, endDate time.Time, assetID *uint64) ([]models.TransactionV2, error)
 	GetSpendingByCategory(userID uint, startDate, endDate time.Time, transactionType int, assetID *uint64) ([]map[string]interface{}, error)
 	GetSpendingByBank(userID uint, startDate, endDate time.Time, assetID *uint64) ([]map[string]interface{}, error)
+	GetSpendingByAsset(userID uint, startDate, endDate time.Time) ([]map[string]interface{}, error)
 	GetIncomeVsExpense(userID uint, startDate, endDate time.Time, assetID *uint64) (map[string]interface{}, error)
 	GetMonthlyTrend(userID uint, startDate, endDate time.Time, assetID *uint64) ([]map[string]interface{}, error)
 	GetRecentTransactions(userID uint, limit int, assetID *uint64) ([]models.TransactionV2, error)
@@ -57,8 +58,8 @@ func (r *analyticsRepository) GetSpendingByBank(userID uint, startDate, endDate 
 	var results []map[string]interface{}
 
 	query := r.db.Table("transactions").
-		Select("banks.id as bank_id, banks.bank_name, SUM(transactions.amount) as total_amount, COUNT(*) as count").
-		Joins("JOIN banks ON transactions.bank_id = banks.id").
+		Select("COALESCE(banks.id, 0) as bank_id, COALESCE(banks.bank_name, 'No Bank') as bank_name, SUM(transactions.amount) as total_amount, COUNT(*) as count").
+		Joins("LEFT JOIN banks ON transactions.bank_id = banks.id").
 		Where("transactions.user_id = ? AND transactions.date BETWEEN ? AND ?",
 			userID, startDate, endDate)
 	if assetID != nil {
@@ -70,46 +71,63 @@ func (r *analyticsRepository) GetSpendingByBank(userID uint, startDate, endDate 
 
 	return results, err
 }
+// GetSpendingByAsset returns spending grouped by asset/wallet
+func (r *analyticsRepository) GetSpendingByAsset(userID uint, startDate, endDate time.Time) ([]map[string]interface{}, error) {
+	var results []map[string]interface{}
 
+	err := r.db.Table("transactions").
+		Select(`
+			assets.id as asset_id, 
+			assets.name as asset_name, 
+			assets.type as asset_type,
+			assets.currency as asset_currency,
+			SUM(CASE WHEN transactions.transaction_type = 1 THEN transactions.amount ELSE 0 END) as total_income,
+			SUM(CASE WHEN transactions.transaction_type = 2 THEN transactions.amount ELSE 0 END) as total_expense,
+			COUNT(*) as transaction_count
+		`).
+		Joins("INNER JOIN assets ON transactions.asset_id = assets.id").
+		Where("transactions.user_id = ? AND transactions.date BETWEEN ? AND ?", userID, startDate, endDate).
+		Group("assets.id, assets.name, assets.type, assets.currency").
+		Order("total_expense DESC").
+		Scan(&results).Error
+
+	return results, err
+}
 func (r *analyticsRepository) GetIncomeVsExpense(userID uint, startDate, endDate time.Time, assetID *uint64) (map[string]interface{}, error) {
 	result := make(map[string]interface{})
 
-	var income, expense int64
-	var incomeCount, expenseCount int64
-
-	queryIncome := r.db.Model(&models.TransactionV2{}).
-		Where("user_id = ? AND transaction_type = ? AND DATE(date) BETWEEN ? AND ?", userID, 1, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	if assetID != nil {
-		queryIncome = queryIncome.Where("asset_id = ?", *assetID)
+	// Optimize with a single query instead of 4 separate queries
+	type QueryResult struct {
+		TotalIncome   int64 `gorm:"column:total_income"`
+		TotalExpense  int64 `gorm:"column:total_expense"`
+		IncomeCount   int64 `gorm:"column:income_count"`
+		ExpenseCount  int64 `gorm:"column:expense_count"`
 	}
-	queryIncome.Select("COALESCE(SUM(amount), 0)").Scan(&income)
 
-	queryIncomeCount := r.db.Model(&models.TransactionV2{}).
-		Where("user_id = ? AND transaction_type = ? AND DATE(date) BETWEEN ? AND ?", userID, 1, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
+	var queryResult QueryResult
+	query := r.db.Model(&models.TransactionV2{}).
+		Select(`
+			COALESCE(SUM(CASE WHEN transaction_type = 1 THEN amount ELSE 0 END), 0) as total_income,
+			COALESCE(SUM(CASE WHEN transaction_type = 2 THEN amount ELSE 0 END), 0) as total_expense,
+			COUNT(CASE WHEN transaction_type = 1 THEN 1 END) as income_count,
+			COUNT(CASE WHEN transaction_type = 2 THEN 1 END) as expense_count
+		`).
+		Where("user_id = ? AND date BETWEEN ? AND ?", userID, startDate, endDate)
+
 	if assetID != nil {
-		queryIncomeCount = queryIncomeCount.Where("asset_id = ?", *assetID)
+		query = query.Where("asset_id = ?", *assetID)
 	}
-	queryIncomeCount.Count(&incomeCount)
 
-	queryExpense := r.db.Model(&models.TransactionV2{}).
-		Where("user_id = ? AND transaction_type = ? AND DATE(date) BETWEEN ? AND ?", userID, 2, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	if assetID != nil {
-		queryExpense = queryExpense.Where("asset_id = ?", *assetID)
+	err := query.Scan(&queryResult).Error
+	if err != nil {
+		return nil, err
 	}
-	queryExpense.Select("COALESCE(SUM(amount), 0)").Scan(&expense)
 
-	queryExpenseCount := r.db.Model(&models.TransactionV2{}).
-		Where("user_id = ? AND transaction_type = ? AND DATE(date) BETWEEN ? AND ?", userID, 2, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	if assetID != nil {
-		queryExpenseCount = queryExpenseCount.Where("asset_id = ?", *assetID)
-	}
-	queryExpenseCount.Count(&expenseCount)
-
-	result["total_income"] = income
-	result["total_expense"] = expense
-	result["income_count"] = incomeCount
-	result["expense_count"] = expenseCount
-	result["net_amount"] = income - expense
+	result["total_income"] = queryResult.TotalIncome
+	result["total_expense"] = queryResult.TotalExpense
+	result["income_count"] = queryResult.IncomeCount
+	result["expense_count"] = queryResult.ExpenseCount
+	result["net_amount"] = queryResult.TotalIncome - queryResult.TotalExpense
 
 	return result, nil
 }

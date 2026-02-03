@@ -60,6 +60,18 @@ type SpendingByBankResponse struct {
 	Count       int     `json:"count"`
 }
 
+type SpendingByAssetResponse struct {
+	AssetID          uint64  `json:"asset_id"`
+	AssetName        string  `json:"asset_name"`
+	AssetType        string  `json:"asset_type"`
+	AssetCurrency    string  `json:"asset_currency"`
+	TotalIncome      int     `json:"total_income"`
+	TotalExpense     int     `json:"total_expense"`
+	NetAmount        int     `json:"net_amount"`
+	Percentage       float64 `json:"percentage"`
+	TransactionCount int     `json:"transaction_count"`
+}
+
 type MonthlyComparisonResponse struct {
 	Month         string  `json:"month"`
 	Income        int     `json:"income"`
