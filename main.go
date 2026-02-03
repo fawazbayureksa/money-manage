@@ -2,7 +2,7 @@ package main
 
 import (
     "my-api/config"
-    "my-api/models"
+    // "my-api/models"
     "my-api/routes"
     "github.com/gin-gonic/gin"
 )
@@ -26,7 +26,7 @@ func CORSMiddleware() gin.HandlerFunc {
 
 func main() {
     config.ConnectDatabase()
-    models.AutoMigrate()
+    // models.AutoMigrate()
 
     r := gin.Default()
    
