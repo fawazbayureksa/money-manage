@@ -1,12 +1,12 @@
 package routes
 
 import (
-    "github.com/gin-gonic/gin"
-    "my-api/config"
-    "my-api/controllers"
-    "my-api/middleware"
-    "my-api/repositories"
-    "my-api/services"
+	"github.com/gin-gonic/gin"
+	"my-api/config"
+	"my-api/controllers"
+	"my-api/middleware"
+	"my-api/repositories"
+	"my-api/services"
 )
 
 func SetupRouter(router *gin.Engine) {
@@ -16,6 +16,8 @@ func SetupRouter(router *gin.Engine) {
 	budgetRepo := repositories.NewBudgetRepository(config.DB)
 	analyticsRepo := repositories.NewAnalyticsRepository(config.DB)
 	transactionRepo := repositories.NewTransactionRepository(config.DB)
+	assetRepo := repositories.NewAssetRepository(config.DB)
+	transactionV2Repo := repositories.NewTransactionV2Repository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -23,6 +25,8 @@ func SetupRouter(router *gin.Engine) {
 	budgetService := services.NewBudgetService(budgetRepo)
 	analyticsService := services.NewAnalyticsService(analyticsRepo, budgetRepo)
 	transactionService := services.NewTransactionService(transactionRepo)
+	assetService := services.NewAssetService(assetRepo)
+	transactionV2Service := services.NewTransactionV2Service(transactionV2Repo, assetRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -31,12 +35,11 @@ func SetupRouter(router *gin.Engine) {
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
-	assetRepo := repositories.NewAssetRepository(config.DB)
-	assetService := services.NewAssetService(assetRepo)
+	transactionV2Controller := controllers.NewTransactionV2Controller(transactionV2Service)
 	assetController := controllers.NewAssetController(assetService)
 
-    api := router.Group("/api")
-    {
+	api := router.Group("/api")
+	{
 		// Auth routes
 		api.POST("/register", authController.Register)
 		api.POST("/login", authController.Login)
@@ -52,11 +55,11 @@ func SetupRouter(router *gin.Engine) {
 		api.POST("/banks", bankController.CreateBank)
 		api.DELETE("/banks/:id", bankController.DeleteBank)
 
-        // Category routes
-        api.GET("/categories", controllers.GetCategories)
-        api.GET("/transaction/initial-data", controllers.GetInitialData)
-        api.DELETE("/categories/:id", controllers.DeleteCategory)
-    }
+		// Category routes
+		api.GET("/categories", controllers.GetCategories)
+		api.GET("/transaction/initial-data", controllers.GetInitialData)
+		api.DELETE("/categories/:id", controllers.DeleteCategory)
+	}
 
 	// Protected routes
 	authorized := router.Group("/api")
@@ -65,12 +68,23 @@ func SetupRouter(router *gin.Engine) {
 		// Auth routes (protected)
 		authorized.POST("/logout", authController.Logout)
 
-		// Transaction routes
+		// Transaction routes (v1 - Legacy, uses BankID)
 		authorized.GET("/transactions", transactionController.GetTransactions)
 		authorized.GET("/transactions/:id", transactionController.GetTransactionByID)
 		authorized.POST("/transaction", transactionController.CreateTransaction)
 		authorized.DELETE("/transactions/:id", transactionController.DeleteTransaction)
-		
+
+		// Transaction routes (v2 - New, uses AssetID with balance sync)
+		v2 := authorized.Group("/v2")
+		{
+			v2.GET("/transactions", transactionV2Controller.GetTransactions)
+			v2.GET("/transactions/:id", transactionV2Controller.GetTransactionByID)
+			v2.POST("/transactions", transactionV2Controller.CreateTransaction)
+			v2.PUT("/transactions/:id", transactionV2Controller.UpdateTransaction)
+			v2.DELETE("/transactions/:id", transactionV2Controller.DeleteTransaction)
+			v2.GET("/assets/:id/transactions", transactionV2Controller.GetAssetTransactions)
+		}
+
 		// Category routes
 		authorized.GET("/my-categories", controllers.GetCategoriesByUser)
 		authorized.POST("/categories", controllers.CreateCategory)
