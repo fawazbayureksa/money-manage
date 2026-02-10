@@ -6,7 +6,7 @@ import (
     "time"
 
     "my-api/config"
-    "my-api/models"
+    // "my-api/models"
     "my-api/routes"
     "my-api/utils"
 
@@ -69,7 +69,7 @@ func main() {
     config.ConnectDatabase()
     utils.LogInfo("Database connected successfully")
 
-    models.AutoMigrate()
+    // models.AutoMigrate()
     utils.LogInfo("Database migrations completed")
 
     r := gin.Default()

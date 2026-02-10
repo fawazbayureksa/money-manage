@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"my-api/dto"
+	"my-api/models"
 	"my-api/services"
 	"my-api/utils"
 	"net/http"
@@ -12,11 +13,15 @@ import (
 )
 
 type AnalyticsController struct {
-	service services.AnalyticsService
+	service         services.AnalyticsService
+	settingsService services.UserSettingsService
 }
 
-func NewAnalyticsController(service services.AnalyticsService) *AnalyticsController {
-	return &AnalyticsController{service: service}
+func NewAnalyticsController(service services.AnalyticsService, settingsService services.UserSettingsService) *AnalyticsController {
+	return &AnalyticsController{
+		service:         service,
+		settingsService: settingsService,
+	}
 }
 
 func (ctrl *AnalyticsController) GetSpendingByCategory(c *gin.Context) {
@@ -76,7 +81,32 @@ func (ctrl *AnalyticsController) GetTrendAnalysis(c *gin.Context) {
 		return
 	}
 
-	result, err := ctrl.service.GetTrendAnalysis(userID.(uint), &req)
+	// Check if user wants to use pay cycle
+	usePayCycle := c.Query("use_pay_cycle") == "true"
+
+	var result *dto.TrendAnalysisResponse
+	var err error
+
+	if usePayCycle {
+		// Get user settings
+		settingsDTO, settingsErr := ctrl.settingsService.GetUserSettings(userID.(uint))
+		if settingsErr != nil {
+			utils.JSONError(c, http.StatusInternalServerError, "Failed to get user settings: "+settingsErr.Error())
+			return
+		}
+
+		// Convert DTO to model
+		modelSettings := &models.UserSettings{
+			PayCycleType:     settingsDTO.PayCycleType,
+			PayDay:           settingsDTO.PayDay,
+			CycleStartOffset: settingsDTO.CycleStartOffset,
+		}
+		
+		result, err = ctrl.service.GetTrendAnalysisWithPayCycle(userID.(uint), &req, modelSettings)
+	} else {
+		result, err = ctrl.service.GetTrendAnalysis(userID.(uint), &req)
+	}
+
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return

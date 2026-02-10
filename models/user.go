@@ -1,6 +1,6 @@
 package models
 
-import "my-api/config"
+// import "my-api/config"
 
 type User struct {
 	ID         uint   `json:"id" gorm:"primaryKey;type:int unsigned"`
@@ -12,6 +12,6 @@ type User struct {
 	Password   string `json:"-" gorm:"not null"` // Never expose password in JSON
 }
 
-func AutoMigrate() {
-	config.DB.AutoMigrate(&User{}, &Bank{}, &Category{}, &Transaction{}, &TransactionV2{}, &Asset{}, &Budget{}, &BudgetAlert{})
-}
+// func AutoMigrate() {
+// 	config.DB.AutoMigrate(&User{}, &Bank{}, &Category{}, &Transaction{}, &TransactionV2{}, &Asset{}, &Budget{}, &BudgetAlert{})
+// }
