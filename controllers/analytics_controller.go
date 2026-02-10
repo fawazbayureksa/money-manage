@@ -107,6 +107,28 @@ func (ctrl *AnalyticsController) GetSpendingByBank(c *gin.Context) {
 	utils.JSONSuccess(c, "Spending by bank retrieved successfully", result)
 }
 
+func (ctrl *AnalyticsController) GetSpendingByAsset(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		utils.JSONError(c, http.StatusUnauthorized, "User not authenticated")
+		return
+	}
+
+	var req dto.AnalyticsRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		utils.JSONError(c, http.StatusBadRequest, "Invalid query parameters: "+err.Error())
+		return
+	}
+
+	result, err := ctrl.service.GetSpendingByAsset(userID.(uint), &req)
+	if err != nil {
+		utils.JSONError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.JSONSuccess(c, "Spending by asset retrieved successfully", result)
+}
+
 func (ctrl *AnalyticsController) GetMonthlyComparison(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -121,7 +143,14 @@ func (ctrl *AnalyticsController) GetMonthlyComparison(c *gin.Context) {
 		}
 	}
 
-	result, err := ctrl.service.GetMonthlyComparison(userID.(uint), months)
+	var assetID *uint64
+	if a := c.Query("asset_id"); a != "" {
+		if parsed, err := strconv.ParseUint(a, 10, 64); err == nil {
+			assetID = &parsed
+		}
+	}
+
+	result, err := ctrl.service.GetMonthlyComparison(userID.(uint), months, assetID)
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return
@@ -150,7 +179,14 @@ func (ctrl *AnalyticsController) GetDashboardSummary(c *gin.Context) {
 		}
 	}
 
-	result, err := ctrl.service.GetDashboardSummary(userID.(uint), startDate, endDate)
+	var assetID *uint64
+	if a := c.Query("asset_id"); a != "" {
+		if parsed, err := strconv.ParseUint(a, 10, 64); err == nil {
+			assetID = &parsed
+		}
+	}
+
+	result, err := ctrl.service.GetDashboardSummary(userID.(uint), startDate, endDate, assetID)
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return
@@ -173,7 +209,14 @@ func (ctrl *AnalyticsController) GetYearlyReport(c *gin.Context) {
 		}
 	}
 
-	result, err := ctrl.service.GetYearlyReport(userID.(uint), year)
+	var assetID *uint64
+	if a := c.Query("asset_id"); a != "" {
+		if parsed, err := strconv.ParseUint(a, 10, 64); err == nil {
+			assetID = &parsed
+		}
+	}
+
+	result, err := ctrl.service.GetYearlyReport(userID.(uint), year, assetID)
 	if err != nil {
 		utils.JSONError(c, http.StatusInternalServerError, err.Error())
 		return

@@ -1,10 +1,10 @@
 package repositories
 
 import (
+	"gorm.io/gorm"
 	"my-api/dto"
 	"my-api/models"
 	"time"
-	"gorm.io/gorm"
 )
 
 type BudgetRepository interface {
@@ -15,8 +15,8 @@ type BudgetRepository interface {
 	Delete(id uint, userID uint) error
 	FindActiveBudgets(userID uint) ([]models.Budget, error)
 	GetSpentAmount(budgetID uint, startDate, endDate time.Time) (int, error)
-	FindBudgetByCategory(userID, categoryID uint, startDate, endDate time.Time) (*models.Budget, error)
-	
+	FindBudgetByCategory(userID, categoryID uint, startDate, endDate time.Time, assetID *uint64) (*models.Budget, error)
+
 	// Budget Alerts
 	CreateAlert(alert *models.BudgetAlert) error
 	GetUserAlerts(userID uint, unreadOnly bool) ([]models.BudgetAlert, error)
@@ -91,7 +91,7 @@ func (r *budgetRepository) FindActiveBudgets(userID uint) ([]models.Budget, erro
 	var budgets []models.Budget
 	now := time.Now()
 	err := r.db.Preload("Category").
-		Where("user_id = ? AND is_active = ? AND start_date <= ? AND end_date >= ?", 
+		Where("user_id = ? AND is_active = ? AND start_date <= ? AND end_date >= ?",
 			userID, true, now, now).
 		Find(&budgets).Error
 	return budgets, err
@@ -104,7 +104,7 @@ func (r *budgetRepository) GetSpentAmount(budgetID uint, startDate, endDate time
 	}
 
 	var total int64
-	err := r.db.Model(&models.Transaction{}).
+	err := r.db.Model(&models.TransactionV2{}).
 		Where("user_id = ? AND category_id = ? AND transaction_type = ? AND date BETWEEN ? AND ?",
 			budget.UserID, budget.CategoryID, 2, startDate, endDate).
 		Select("COALESCE(SUM(amount), 0)").
@@ -113,11 +113,10 @@ func (r *budgetRepository) GetSpentAmount(budgetID uint, startDate, endDate time
 	return int(total), err
 }
 
-func (r *budgetRepository) FindBudgetByCategory(userID, categoryID uint, startDate, endDate time.Time) (*models.Budget, error) {
+func (r *budgetRepository) FindBudgetByCategory(userID, categoryID uint, startDate, endDate time.Time, assetID *uint64) (*models.Budget, error) {
 	var budget models.Budget
 	err := r.db.Where("user_id = ? AND category_id = ? AND start_date <= ? AND end_date >= ?",
-		userID, categoryID, endDate, startDate).
-		First(&budget).Error
+		userID, categoryID, endDate, startDate).First(&budget).Error
 	return &budget, err
 }
 
@@ -128,11 +127,11 @@ func (r *budgetRepository) CreateAlert(alert *models.BudgetAlert) error {
 func (r *budgetRepository) GetUserAlerts(userID uint, unreadOnly bool) ([]models.BudgetAlert, error) {
 	var alerts []models.BudgetAlert
 	query := r.db.Preload("Budget.Category").Where("user_id = ?", userID)
-	
+
 	if unreadOnly {
 		query = query.Where("is_read = ?", false)
 	}
-	
+
 	err := query.Order("created_at DESC").Find(&alerts).Error
 	return alerts, err
 }
@@ -142,7 +141,7 @@ func (r *budgetRepository) GetUserAlertsPaginated(userID uint, filter *dto.Alert
 	var total int64
 
 	query := r.db.Model(&models.BudgetAlert{}).Where("user_id = ?", userID)
-	
+
 	if filter.UnreadOnly {
 		query = query.Where("is_read = ?", false)
 	}

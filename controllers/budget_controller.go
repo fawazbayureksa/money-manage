@@ -1,13 +1,13 @@
 package controllers
 
 import (
+	"github.com/gin-gonic/gin"
 	"my-api/dto"
 	"my-api/services"
 	"my-api/utils"
 	"net/http"
 	"strconv"
 	"time"
-	"github.com/gin-gonic/gin"
 )
 
 type BudgetController struct {
@@ -43,10 +43,21 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 		return
 	}
 
-	if amount, ok := payload["amount"].(float64); ok {
-		req.Amount = int(amount)
-	} else {
+	amountVal, ok := payload["amount"]
+	if !ok {
 		utils.JSONError(c, http.StatusBadRequest, "amount is required")
+		return
+	}
+
+	switch v := amountVal.(type) {
+	case float64:
+		req.Amount = int(v)
+	case int:
+		req.Amount = v
+	case int64:
+		req.Amount = int(v)
+	default:
+		utils.JSONError(c, http.StatusBadRequest, "amount must be a number")
 		return
 	}
 
@@ -78,7 +89,6 @@ func (ctrl *BudgetController) CreateBudget(c *gin.Context) {
 		return
 	}
 
-	// Optional fields
 	if alertAt, ok := payload["alert_at"].(float64); ok {
 		req.AlertAt = int(alertAt)
 	}
