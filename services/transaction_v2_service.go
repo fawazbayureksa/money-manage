@@ -9,7 +9,7 @@ import (
 )
 
 type TransactionV2Service interface {
-	GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error)
+	GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error)
 	GetTransactionByID(id, userID uint) (*dto.TransactionV2Response, error)
 	CreateTransaction(transaction *models.TransactionV2) error
 	UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int) error
@@ -29,7 +29,7 @@ func NewTransactionV2Service(transactionRepo repositories.TransactionV2Repositor
 	}
 }
 
-func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error) {
+func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error) {
 	transactions, total, err := s.transactionRepo.GetAll(userID, page, limit, startDate, endDate, transactionType, categoryID, assetID)
 	if err != nil {
 		return nil, nil, err

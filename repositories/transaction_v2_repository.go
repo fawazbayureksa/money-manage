@@ -9,7 +9,7 @@ import (
 )
 
 type TransactionV2Repository interface {
-	GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]models.TransactionV2, int64, error)
+	GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]models.TransactionV2, int64, error)
 	GetByID(id, userID uint) (*models.TransactionV2, error)
 	GetByIDWithAsset(id, userID uint) (*models.TransactionV2, error)
 	CreateWithBalanceUpdate(transaction *models.TransactionV2) error
@@ -26,7 +26,7 @@ func NewTransactionV2Repository(db *gorm.DB) TransactionV2Repository {
 	return &transactionV2Repository{db: db}
 }
 
-func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]models.TransactionV2, int64, error) {
+func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]models.TransactionV2, int64, error) {
 	var transactions []models.TransactionV2
 	var total int64
 

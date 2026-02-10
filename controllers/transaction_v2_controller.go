@@ -45,7 +45,7 @@ func (ctrl *TransactionV2Controller) GetTransactions(c *gin.Context) {
 
 	var startDate, endDate *time.Time
 	var transactionType *int
-	var categoryID *uint64
+	var categoryID *uint
 	var assetID *uint64
 
 	if startDateStr := c.Query("start_date"); startDateStr != "" {
@@ -78,15 +78,16 @@ func (ctrl *TransactionV2Controller) GetTransactions(c *gin.Context) {
 	}
 
 	if catIDStr := c.Query("category_id"); catIDStr != "" {
-		if catID, err := strconv.ParseUint(catIDStr, 10, 64); err == nil {
-			catIDUint := catID
-			categoryID = &catIDUint
+		if catID, err := strconv.ParseUint(catIDStr, 10, 32); err == nil {
+			temp := uint(catID)
+			categoryID = &temp
 		}
 	}
 
 	if assetIDStr := c.Query("asset_id"); assetIDStr != "" {
 		if aID, err := strconv.ParseUint(assetIDStr, 10, 64); err == nil {
-			assetID = &aID
+			temp := aID
+			assetID = &temp
 		}
 	}
 
