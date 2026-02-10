@@ -1,9 +1,15 @@
 package main
 
 import (
+    "log"
+    "os"
+    "time"
+
     "my-api/config"
     "my-api/models"
     "my-api/routes"
+    "my-api/utils"
+
     "github.com/gin-gonic/gin"
 )
 
@@ -20,18 +26,63 @@ func CORSMiddleware() gin.HandlerFunc {
         }
 
         c.Next()
-    }   
+    }
+}
+
+// LoggerMiddleware logs HTTP requests
+func LoggerMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        startTime := time.Now()
+        path := c.Request.URL.Path
+        method := c.Request.Method
+
+        c.Next()
+
+        latency := time.Since(startTime)
+        statusCode := c.Writer.Status()
+        clientIP := c.ClientIP()
+
+        utils.LogInfof("%s | %3d | %13v | %15s | %s",
+            method,
+            statusCode,
+            latency,
+            clientIP,
+            path,
+        )
+    }
 }   
 
 
 func main() {
+    // Initialize logger
+    utils.InitLogger()
+
+    // Setup log file (optional - logs to both file and console)
+    logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+    if err != nil {
+        log.Fatal("Failed to open log file:", err)
+    }
+    defer logFile.Close()
+
+    utils.LogInfo("Starting Money Manage API...")
+
     config.ConnectDatabase()
+    utils.LogInfo("Database connected successfully")
+
     models.AutoMigrate()
+    utils.LogInfo("Database migrations completed")
 
     r := gin.Default()
-   
+
     r.Use(CORSMiddleware())
+    r.Use(LoggerMiddleware())
 
     routes.SetupRouter(r)
-    r.Run(":8080")
+    utils.LogInfo("Routes configured successfully")
+
+    utils.LogInfo("Server starting on port 8080...")
+    if err := r.Run(":8080"); err != nil {
+        utils.LogErrorf("Failed to start server: %v", err)
+        log.Fatal(err)
+    }
 }
