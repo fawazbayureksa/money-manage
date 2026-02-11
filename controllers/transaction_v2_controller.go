@@ -14,11 +14,13 @@ import (
 
 type TransactionV2Controller struct {
 	transactionService services.TransactionV2Service
+	budgetService      services.BudgetService
 }
 
-func NewTransactionV2Controller(transactionService services.TransactionV2Service) *TransactionV2Controller {
+func NewTransactionV2Controller(transactionService services.TransactionV2Service, budgetService services.BudgetService) *TransactionV2Controller {
 	return &TransactionV2Controller{
 		transactionService: transactionService,
+		budgetService:      budgetService,
 	}
 }
 
@@ -201,6 +203,11 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Check budget alerts if this is an expense transaction
+	if transaction.TransactionType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+	}
+
 	created, _ := ctrl.transactionService.GetTransactionByID(transaction.ID, userIDUint)
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
@@ -295,6 +302,11 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Check budget alerts if transaction involves expenses (old or new type)
+	if transaction.TransactionType == 2 || oldType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+	}
+
 	updated, _ := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -322,9 +334,21 @@ func (ctrl *TransactionV2Controller) DeleteTransaction(c *gin.Context) {
 		return
 	}
 
+	// Get transaction before deletion to check if it was an expense
+	transaction, err := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Transaction not found or unauthorized"})
+		return
+	}
+
 	if err := ctrl.transactionService.DeleteTransaction(uint(id), userIDUint); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Transaction not found or unauthorized"})
 		return
+	}
+
+	// Check budget alerts if this was an expense transaction
+	if transaction.TransactionType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

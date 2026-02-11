@@ -35,7 +35,7 @@ func SetupRouter(router *gin.Engine) {
 	budgetController := controllers.NewBudgetController(budgetService)
 	analyticsController := controllers.NewAnalyticsController(analyticsService)
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
-	transactionV2Controller := controllers.NewTransactionV2Controller(transactionV2Service)
+	transactionV2Controller := controllers.NewTransactionV2Controller(transactionV2Service, budgetService)
 	assetController := controllers.NewAssetController(assetService)
 
 	api := router.Group("/api")
