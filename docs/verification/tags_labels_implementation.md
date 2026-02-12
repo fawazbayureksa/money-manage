@@ -476,15 +476,16 @@ DROP TABLE IF EXISTS tags;
 6. `controllers/tag_controller.go`
 7. `docs/verification/tags_labels_implementation.md` (this file)
 
-### Modified Files (5)
+### Modified Files (7)
 1. `models/transaction_v2.go` - Added Tags relationship
 2. `dto/transaction_v2_dto.go` - Added tag_ids and tags fields
 3. `repositories/transaction_v2_repository.go` - Added tag methods and preloading
 4. `services/transaction_v2_service.go` - Added tag handling
 5. `controllers/transaction_v2_controller.go` - Added tag endpoints
 6. `routes/routes.go` - Added tag routes
+7. `utils/response.go` - Added helper functions for consistent responses
 
-### Total: 13 files (7 new, 6 modified)
+### Total: 14 files (7 new, 7 modified)
 
 ---
 

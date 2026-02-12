@@ -202,14 +202,11 @@ func (s *transactionV2Service) AddTagsToTransaction(transactionID, userID uint, 
 		return err
 	}
 
-	// Verify all tags belong to user and increment usage count
+	// Verify all tags belong to user
 	for _, tagID := range tagIDs {
-		tag, err := s.tagRepo.FindByID(tagID, userID)
+		_, err := s.tagRepo.FindByID(tagID, userID)
 		if err != nil {
 			return errors.New("one or more tags not found or do not belong to you")
-		}
-		if tag == nil {
-			return errors.New("one or more tags not found")
 		}
 	}
 
