@@ -26,3 +26,19 @@ func JSONError(c *gin.Context, status int, message string) {
         Data:    nil,
     })
 }
+
+func SuccessResponse(message string, data interface{}) Response {
+    return Response{
+        Success: true,
+        Message: message,
+        Data:    data,
+    }
+}
+
+func ErrorResponse(message string) Response {
+    return Response{
+        Success: false,
+        Message: message,
+        Data:    nil,
+    }
+}
