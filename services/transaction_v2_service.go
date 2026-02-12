@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
@@ -220,7 +221,11 @@ func (s *transactionV2Service) AddTagsToTransaction(transactionID, userID uint, 
 
 	// Increment usage count for all tags
 	for _, tagID := range tagIDs {
-		_ = s.tagRepo.IncrementUsage(tagID)
+		if err := s.tagRepo.IncrementUsage(tagID); err != nil {
+			// Log the error but don't fail the operation
+			// as the tags are already added successfully
+			log.Printf("Failed to increment usage count for tag %d: %v", tagID, err)
+		}
 	}
 
 	return nil

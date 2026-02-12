@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"my-api/dto"
 	"my-api/models"
 	"my-api/services"
@@ -204,10 +205,13 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	}
 
 	// Add tags if provided
+	tagError := ""
 	if len(req.TagIDs) > 0 {
 		if err := ctrl.transactionService.AddTagsToTransaction(transaction.ID, userIDUint, req.TagIDs); err != nil {
 			// Transaction is already created, so we don't fail here
-			// Just log the error or handle it gracefully
+			// Log the error and inform the user
+			log.Printf("Failed to add tags to transaction %d: %v", transaction.ID, err)
+			tagError = "Warning: Transaction created but failed to add some tags"
 		}
 	}
 
@@ -217,9 +221,15 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	}
 
 	created, _ := ctrl.transactionService.GetTransactionByID(transaction.ID, userIDUint)
+	
+	message := "Transaction created successfully"
+	if tagError != "" {
+		message = tagError
+	}
+	
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"message": "Transaction created successfully",
+		"message": message,
 		"data":    created,
 	})
 }

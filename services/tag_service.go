@@ -5,6 +5,7 @@ import (
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
+	"sort"
 	"strings"
 	"time"
 )
@@ -188,14 +189,10 @@ func (s *tagService) SuggestTags(userID, categoryID uint, description string) ([
 		}
 	}
 
-	// Sort by confidence (descending)
-	for i := 0; i < len(suggestions)-1; i++ {
-		for j := i + 1; j < len(suggestions); j++ {
-			if suggestions[j].Confidence > suggestions[i].Confidence {
-				suggestions[i], suggestions[j] = suggestions[j], suggestions[i]
-			}
-		}
-	}
+	// Sort by confidence (descending) using standard library
+	sort.Slice(suggestions, func(i, j int) bool {
+		return suggestions[i].Confidence > suggestions[j].Confidence
+	})
 
 	// Return top 5
 	if len(suggestions) > 5 {

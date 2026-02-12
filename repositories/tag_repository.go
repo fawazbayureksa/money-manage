@@ -159,7 +159,7 @@ func (r *tagRepository) GetSpendingByTag(userID uint, startDate, endDate time.Ti
 		return nil, err
 	}
 
-	// Build the Tag objects and calculate averages
+	// Build the Tag objects (avg_amount is already calculated by SQL query)
 	for i := range results {
 		results[i].Tag = models.Tag{
 			ID:         results[i].Tag.ID,
@@ -167,9 +167,6 @@ func (r *tagRepository) GetSpendingByTag(userID uint, startDate, endDate time.Ti
 			Color:      results[i].Tag.Color,
 			Icon:       results[i].Tag.Icon,
 			UsageCount: results[i].Tag.UsageCount,
-		}
-		if results[i].TransactionCount > 0 {
-			results[i].AvgAmount = results[i].TotalAmount / float64(results[i].TransactionCount)
 		}
 	}
 

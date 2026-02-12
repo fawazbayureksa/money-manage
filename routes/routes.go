@@ -93,12 +93,12 @@ func SetupRouter(router *gin.Engine) {
 			v2.DELETE("/transactions/:id/tags/:tag_id", transactionV2Controller.RemoveTagFromTransaction)
 
 			// Tag management endpoints
+			v2.GET("/tags/suggest", tagController.SuggestTags)
 			v2.GET("/tags", tagController.GetTags)
 			v2.GET("/tags/:id", tagController.GetTagByID)
 			v2.POST("/tags", tagController.CreateTag)
 			v2.PUT("/tags/:id", tagController.UpdateTag)
 			v2.DELETE("/tags/:id", tagController.DeleteTag)
-			v2.GET("/tags/suggest", tagController.SuggestTags)
 
 			// Analytics endpoints
 			v2.GET("/analytics/spending-by-tag", tagController.GetSpendingByTag)
