@@ -203,6 +203,14 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Add tags if provided
+	if len(req.TagIDs) > 0 {
+		if err := ctrl.transactionService.AddTagsToTransaction(transaction.ID, userIDUint, req.TagIDs); err != nil {
+			// Transaction is already created, so we don't fail here
+			// Just log the error or handle it gracefully
+		}
+	}
+
 	// Check budget alerts if this is an expense transaction
 	if transaction.TransactionType == 2 {
 		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
@@ -395,4 +403,72 @@ func (ctrl *TransactionV2Controller) GetAssetTransactions(c *gin.Context) {
 		"message": "Asset transactions fetched successfully",
 		"data":    response,
 	})
+}
+
+// AddTagsToTransaction adds tags to an existing transaction
+func (ctrl *TransactionV2Controller) AddTagsToTransaction(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, utils.ErrorResponse("User not authenticated"))
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, utils.ErrorResponse("Invalid user ID"))
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid transaction ID"))
+		return
+	}
+
+	var req dto.AddTagsToTransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	if err := ctrl.transactionService.AddTagsToTransaction(uint(id), userIDUint, req.TagIDs); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, utils.SuccessResponse("Tags added to transaction successfully", nil))
+}
+
+// RemoveTagFromTransaction removes a tag from a transaction
+func (ctrl *TransactionV2Controller) RemoveTagFromTransaction(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, utils.ErrorResponse("User not authenticated"))
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, utils.ErrorResponse("Invalid user ID"))
+		return
+	}
+
+	transactionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid transaction ID"))
+		return
+	}
+
+	tagID, err := strconv.ParseUint(c.Param("tag_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid tag ID"))
+		return
+	}
+
+	if err := ctrl.transactionService.RemoveTagFromTransaction(uint(transactionID), userIDUint, uint(tagID)); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, utils.SuccessResponse("Tag removed from transaction successfully", nil))
 }

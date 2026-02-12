@@ -16,6 +16,8 @@ type TransactionV2Repository interface {
 	UpdateWithBalanceUpdate(transaction *models.TransactionV2, oldAmount int, oldType int) error
 	DeleteWithBalanceRollback(id, userID uint) error
 	GetByAssetID(assetID uint64, userID uint, page, limit int) ([]models.TransactionV2, int64, error)
+	AddTagsToTransaction(transactionID uint, tagIDs []uint) error
+	RemoveTagFromTransaction(transactionID uint, tagID uint) error
 }
 
 type transactionV2Repository struct {
@@ -55,6 +57,7 @@ func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate
 		Preload("Category").
 		Preload("Bank").
 		Preload("Asset").
+		Preload("Tags").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
@@ -69,6 +72,7 @@ func (r *transactionV2Repository) GetByID(id, userID uint) (*models.TransactionV
 		Preload("Category").
 		Preload("Bank").
 		Preload("Asset").
+		Preload("Tags").
 		Where("id = ? AND user_id = ?", id, userID).
 		First(&transaction).Error
 
@@ -189,10 +193,54 @@ func (r *transactionV2Repository) GetByAssetID(assetID uint64, userID uint, page
 	err := query.
 		Preload("Category").
 		Preload("Bank").
+		Preload("Tags").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&transactions).Error
 
 	return transactions, total, err
+}
+
+func (r *transactionV2Repository) AddTagsToTransaction(transactionID uint, tagIDs []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var transaction models.TransactionV2
+		if err := tx.First(&transaction, transactionID).Error; err != nil {
+			return err
+		}
+
+		// Get the tags
+		var tags []models.Tag
+		if err := tx.Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+			return err
+		}
+
+		// Associate tags with transaction
+		if err := tx.Model(&transaction).Association("Tags").Append(&tags); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (r *transactionV2Repository) RemoveTagFromTransaction(transactionID uint, tagID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var transaction models.TransactionV2
+		if err := tx.First(&transaction, transactionID).Error; err != nil {
+			return err
+		}
+
+		var tag models.Tag
+		if err := tx.First(&tag, tagID).Error; err != nil {
+			return err
+		}
+
+		// Remove tag from transaction
+		if err := tx.Model(&transaction).Association("Tags").Delete(&tag); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

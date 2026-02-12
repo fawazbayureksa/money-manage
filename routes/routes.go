@@ -18,6 +18,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionRepo := repositories.NewTransactionRepository(config.DB)
 	assetRepo := repositories.NewAssetRepository(config.DB)
 	transactionV2Repo := repositories.NewTransactionV2Repository(config.DB)
+	tagRepo := repositories.NewTagRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -26,7 +27,8 @@ func SetupRouter(router *gin.Engine) {
 	analyticsService := services.NewAnalyticsService(analyticsRepo, budgetRepo)
 	transactionService := services.NewTransactionService(transactionRepo)
 	assetService := services.NewAssetService(assetRepo)
-	transactionV2Service := services.NewTransactionV2Service(transactionV2Repo, assetRepo)
+	transactionV2Service := services.NewTransactionV2Service(transactionV2Repo, assetRepo, tagRepo)
+	tagService := services.NewTagService(tagRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -37,6 +39,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionController := controllers.NewTransactionController(transactionService, budgetService)
 	transactionV2Controller := controllers.NewTransactionV2Controller(transactionV2Service, budgetService)
 	assetController := controllers.NewAssetController(assetService)
+	tagController := controllers.NewTagController(tagService)
 
 	api := router.Group("/api")
 	{
@@ -77,12 +80,28 @@ func SetupRouter(router *gin.Engine) {
 		// Transaction routes (v2 - New, uses AssetID with balance sync)
 		v2 := authorized.Group("/v2")
 		{
+			// Transaction endpoints
 			v2.GET("/transactions", transactionV2Controller.GetTransactions)
 			v2.GET("/transactions/:id", transactionV2Controller.GetTransactionByID)
 			v2.POST("/transactions", transactionV2Controller.CreateTransaction)
 			v2.PUT("/transactions/:id", transactionV2Controller.UpdateTransaction)
 			v2.DELETE("/transactions/:id", transactionV2Controller.DeleteTransaction)
 			v2.GET("/assets/:id/transactions", transactionV2Controller.GetAssetTransactions)
+
+			// Transaction tag endpoints
+			v2.POST("/transactions/:id/tags", transactionV2Controller.AddTagsToTransaction)
+			v2.DELETE("/transactions/:id/tags/:tag_id", transactionV2Controller.RemoveTagFromTransaction)
+
+			// Tag management endpoints
+			v2.GET("/tags", tagController.GetTags)
+			v2.GET("/tags/:id", tagController.GetTagByID)
+			v2.POST("/tags", tagController.CreateTag)
+			v2.PUT("/tags/:id", tagController.UpdateTag)
+			v2.DELETE("/tags/:id", tagController.DeleteTag)
+			v2.GET("/tags/suggest", tagController.SuggestTags)
+
+			// Analytics endpoints
+			v2.GET("/analytics/spending-by-tag", tagController.GetSpendingByTag)
 		}
 
 		// Category routes
