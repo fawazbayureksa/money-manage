@@ -1,85 +1,76 @@
 package main
 
 import (
-    "log"
-    "os"
-    "time"
+	"log"
+	"time"
 
-    "my-api/config"
-    // "my-api/models"
-    "my-api/routes"
-    "my-api/utils"
+	"my-api/config"
+	// "my-api/models"
+	"my-api/routes"
+	"my-api/utils"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
 )
 
 func CORSMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-        c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
-        c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 
-        if c.Request.Method == "OPTIONS" {
-            c.AbortWithStatus(204)
-            return
-        }
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
 
-        c.Next()
-    }
+		c.Next()
+	}
 }
 
 // LoggerMiddleware logs HTTP requests
 func LoggerMiddleware() gin.HandlerFunc {
-    return func(c *gin.Context) {
-        startTime := time.Now()
-        path := c.Request.URL.Path
-        method := c.Request.Method
+	return func(c *gin.Context) {
+		startTime := time.Now()
+		path := c.Request.URL.Path
+		method := c.Request.Method
 
-        c.Next()
+		c.Next()
 
-        latency := time.Since(startTime)
-        statusCode := c.Writer.Status()
-        clientIP := c.ClientIP()
+		latency := time.Since(startTime)
+		statusCode := c.Writer.Status()
+		clientIP := c.ClientIP()
 
-        utils.LogInfof("%s | %3d | %13v | %15s | %s",
-            method,
-            statusCode,
-            latency,
-            clientIP,
-            path,
-        )
-    }
-}   
-
+		utils.LogInfof("%s | %3d | %13v | %15s | %s",
+			method,
+			statusCode,
+			latency,
+			clientIP,
+			path,
+		)
+	}
+}
 
 func main() {
-    // Initialize logger
-    utils.InitLogger()
+	// Initialize logger
+	utils.InitLogger()
 
-    // Setup log file (optional - logs to both file and console)
-    logFile, err := os.OpenFile("app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-    if err != nil {
-        log.Fatal("Failed to open log file:", err)
-    }
-    defer logFile.Close()
+	utils.LogInfo("Starting Money Manage API...")
 
-    utils.LogInfo("Starting Money Manage API...")
+	config.ConnectDatabase()
+	// models.AutoMigrate()
 
-    config.ConnectDatabase()
-    // models.AutoMigrate()
+	r := gin.Default()
 
-    r := gin.Default()
+	r.Use(CORSMiddleware())
+	r.Use(LoggerMiddleware())
 
-    r.Use(CORSMiddleware())
-    r.Use(LoggerMiddleware())
+	routes.SetupRouter(r)
+	utils.LogInfo("Routes configured successfully")
 
-    routes.SetupRouter(r)
-    utils.LogInfo("Routes configured successfully")
-
-    utils.LogInfo("Server starting on port 8080...")
-    if err := r.Run(":8080"); err != nil {
-        utils.LogErrorf("Failed to start server: %v", err)
-        log.Fatal(err)
-    }
+	utils.LogInfo("Server starting on port 8080...")
+	if err := r.Run(":8080"); err != nil {
+		utils.LogErrorf("Failed to start server: %v", err)
+		log.Fatal(err)
+	}
 }
