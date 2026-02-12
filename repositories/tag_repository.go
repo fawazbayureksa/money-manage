@@ -123,6 +123,7 @@ func (r *tagRepository) GetTagsByCategory(userID, categoryID uint, days int) ([]
 		WHERE tg.user_id = ?
 		  AND t.category_id = ?
 		  AND t.date >= ?
+		  AND tg.deleted_at IS NULL
 		GROUP BY tt.tag_id
 		ORDER BY count DESC
 		LIMIT 10
@@ -135,6 +136,19 @@ func (r *tagRepository) GetTagsByCategory(userID, categoryID uint, days int) ([]
 func (r *tagRepository) GetSpendingByTag(userID uint, startDate, endDate time.Time) ([]dto.TagSpending, error) {
 	var results []dto.TagSpending
 
+	// Using a struct to properly scan the results
+	type TagSpendingRow struct {
+		TagID            uint    `gorm:"column:id"`
+		TagName          string  `gorm:"column:name"`
+		TagColor         string  `gorm:"column:color"`
+		TagIcon          string  `gorm:"column:icon"`
+		TagUsageCount    int     `gorm:"column:usage_count"`
+		TotalAmount      float64 `gorm:"column:total_amount"`
+		TransactionCount int     `gorm:"column:transaction_count"`
+		AvgAmount        float64 `gorm:"column:avg_amount"`
+	}
+
+	var rows []TagSpendingRow
 	err := r.db.Raw(`
 		SELECT 
 			t.id,
@@ -151,22 +165,29 @@ func (r *tagRepository) GetSpendingByTag(userID uint, startDate, endDate time.Ti
 		WHERE t.user_id = ?
 		  AND tx.transaction_type = 2
 		  AND tx.date BETWEEN ? AND ?
+		  AND t.deleted_at IS NULL
 		GROUP BY t.id, t.name, t.color, t.icon, t.usage_count
 		ORDER BY total_amount DESC
-	`, userID, startDate, endDate).Scan(&results).Error
+	`, userID, startDate, endDate).Scan(&rows).Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	// Build the Tag objects (avg_amount is already calculated by SQL query)
-	for i := range results {
-		results[i].Tag = models.Tag{
-			ID:         results[i].Tag.ID,
-			Name:       results[i].Tag.Name,
-			Color:      results[i].Tag.Color,
-			Icon:       results[i].Tag.Icon,
-			UsageCount: results[i].Tag.UsageCount,
+	// Convert rows to TagSpending structs
+	results = make([]dto.TagSpending, len(rows))
+	for i, row := range rows {
+		results[i] = dto.TagSpending{
+			Tag: models.Tag{
+				ID:         row.TagID,
+				Name:       row.TagName,
+				Color:      row.TagColor,
+				Icon:       row.TagIcon,
+				UsageCount: row.TagUsageCount,
+			},
+			TotalAmount:      row.TotalAmount,
+			TransactionCount: row.TransactionCount,
+			AvgAmount:        row.AvgAmount,
 		}
 	}
 
