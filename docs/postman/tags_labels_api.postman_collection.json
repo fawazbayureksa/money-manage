@@ -1,0 +1,679 @@
+{
+  "info": {
+    "_postman_id": "tags-labels-api-collection",
+    "name": "Tags & Labels API - Transaction V2",
+    "description": "Postman collection for testing the Tags & Labels feature of the money-manage application (Transaction V2).\n\n## Setup\n1. Set the `base_url` variable to your server (default: http://localhost:8080)\n2. Run the **Login** request first — the token is saved automatically to `auth_token`\n3. All other requests use `{{auth_token}}` in the Authorization header\n\n## Flow\n1. Login → get token\n2. Create Tags\n3. Create Transaction (with tag_ids)\n4. Add/Remove Tags on existing transactions\n5. Get Suggestions & Analytics",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tag_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('auth_token', jsonData.data.token);",
+                  "    console.log('Token saved:', jsonData.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "login"]
+            },
+            "description": "Authenticate and retrieve a Bearer token. The token is automatically saved to the `auth_token` collection variable."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tag Management",
+      "item": [
+        {
+          "name": "Create Tag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('tag_id', jsonData.data.id);",
+                  "    console.log('Tag ID saved:', jsonData.data.id);",
+                  "}",
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('Response has success true', function () {",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Date Night\",\n  \"color\": \"#EC4899\",\n  \"icon\": \"❤️\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"]
+            },
+            "description": "Create a new tag. `color` is a hex code (default `#6366F1` if omitted). `icon` is an optional emoji."
+          }
+        },
+        {
+          "name": "Create Tag - Default Color (No Color Provided)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('Default color applied', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data.color).to.eql('#6366F1');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Vacation\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"]
+            },
+            "description": "Edge case: create tag without color. Should get default color `#6366F1`."
+          }
+        },
+        {
+          "name": "Create Tag - Duplicate (Expect Error)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should fail with 4xx for duplicate tag', function () {",
+                  "    pm.expect(pm.response.code).to.be.within(400, 499);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Date Night\",\n  \"color\": \"#EC4899\",\n  \"icon\": \"❤️\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"]
+            },
+            "description": "Edge case: attempt to create a duplicate tag for the same user. Expects a 4xx error due to unique constraint on (user_id, name)."
+          }
+        },
+        {
+          "name": "Get All Tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response is array', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags?sort=usage",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "usage",
+                  "description": "Sort by usage count (popularity). Remove to get default sort."
+                }
+              ]
+            },
+            "description": "List all tags for the authenticated user. Supports optional `sort=usage` query param for popularity sorting."
+          }
+        },
+        {
+          "name": "Get Tag by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Data has id field', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('id');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            },
+            "description": "Retrieve a single tag by its ID."
+          }
+        },
+        {
+          "name": "Update Tag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Tag updated successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Date Night 💕\",\n  \"color\": \"#F43F5E\",\n  \"icon\": \"💕\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            },
+            "description": "Update an existing tag's name, color, or icon."
+          }
+        },
+        {
+          "name": "Delete Tag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Tag deleted successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            },
+            "description": "Soft-delete a tag. Historical transaction data is preserved."
+          }
+        },
+        {
+          "name": "Get Tag Suggestions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Suggestions returned', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/suggest?category_id=3&description=dinner",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "suggest"],
+              "query": [
+                {
+                  "key": "category_id",
+                  "value": "3",
+                  "description": "Category ID to base suggestions on (50% weight)"
+                },
+                {
+                  "key": "description",
+                  "value": "dinner",
+                  "description": "Transaction description for keyword matching (30% weight)"
+                }
+              ]
+            },
+            "description": "Returns intelligent tag suggestions based on category history (50%), keyword match (30%), and popularity (20%). Both `category_id` and `description` are optional but improve suggestion quality."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transaction V2 with Tags",
+      "item": [
+        {
+          "name": "Create Transaction with Tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.collectionVariables.set('transaction_id', jsonData.data.id);",
+                  "    console.log('Transaction ID saved:', jsonData.data.id);",
+                  "}",
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('Transaction has tags', function () {",
+                  "    pm.expect(jsonData.data.tags).to.be.an('array');",
+                  "    pm.expect(jsonData.data.tags.length).to.be.greaterThan(0);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Dinner at Sushi Tei\",\n  \"amount\": 450000,\n  \"transaction_type\": \"Expense\",\n  \"category_id\": 3,\n  \"asset_id\": 1,\n  \"date\": \"2026-02-11\",\n  \"tag_ids\": [1, 3]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions"]
+            },
+            "description": "Create a new V2 transaction with optional `tag_ids`. The `tag_ids` array accepts existing tag IDs. Tags will appear in the response and their `usage_count` will be incremented."
+          }
+        },
+        {
+          "name": "Create Transaction without Tags",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 201', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+                  "});",
+                  "pm.test('Transaction created successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Grocery shopping\",\n  \"amount\": 150000,\n  \"transaction_type\": \"Expense\",\n  \"category_id\": 1,\n  \"asset_id\": 1,\n  \"date\": \"2026-02-12\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions"]
+            },
+            "description": "Create a V2 transaction without tags (tag_ids omitted)."
+          }
+        },
+        {
+          "name": "Add Tags to Existing Transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Tags added successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tag_ids\": [2, 4]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}/tags",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "v2",
+                "transactions",
+                "{{transaction_id}}",
+                "tags"
+              ]
+            },
+            "description": "Add one or more tags to an already-existing transaction."
+          }
+        },
+        {
+          "name": "Remove Tag from Transaction",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Tag removed successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "v2",
+                "transactions",
+                "{{transaction_id}}",
+                "tags",
+                "{{tag_id}}"
+              ]
+            },
+            "description": "Remove a specific tag from a transaction. The tag itself is NOT deleted, only the association."
+          }
+        },
+        {
+          "name": "Add Non-Existent Tag to Transaction (Expect Error)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Should fail with 4xx for invalid tag', function () {",
+                  "    pm.expect(pm.response.code).to.be.within(400, 499);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tag_ids\": [999999]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}/tags",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "v2",
+                "transactions",
+                "{{transaction_id}}",
+                "tags"
+              ]
+            },
+            "description": "Edge case: try to add a tag ID that does not exist. Expects a 4xx error."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Get Spending by Tag",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('Response has data and period', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.be.true;",
+                  "    pm.expect(jsonData.data).to.have.property('data');",
+                  "    pm.expect(jsonData.data).to.have.property('period');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                { "key": "token", "value": "{{auth_token}}", "type": "string" }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v2/analytics/spending-by-tag?start_date=2026-01-01&end_date=2026-02-28",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "analytics", "spending-by-tag"],
+              "query": [
+                {
+                  "key": "start_date",
+                  "value": "2026-01-01",
+                  "description": "Start of the date range (YYYY-MM-DD)"
+                },
+                {
+                  "key": "end_date",
+                  "value": "2026-02-28",
+                  "description": "End of the date range (YYYY-MM-DD)"
+                }
+              ]
+            },
+            "description": "Returns spending statistics grouped by tags for the given date range. Each entry includes total_amount, transaction_count, and avg_amount."
+          }
+        }
+      ]
+    }
+  ]
+}
