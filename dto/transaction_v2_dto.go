@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"my-api/models"
 	"my-api/utils"
 )
 
@@ -18,6 +19,7 @@ type TransactionV2Response struct {
 	AssetType       string           `json:"asset_type,omitempty"`
 	AssetBalance    float64          `json:"asset_balance,omitempty"`
 	AssetCurrency   string           `json:"asset_currency,omitempty"`
+	Tags            []models.Tag     `json:"tags,omitempty"`
 }
 
 // CreateTransactionV2Request represents request to create transaction with asset
@@ -28,6 +30,7 @@ type CreateTransactionV2Request struct {
 	Amount          int    `json:"amount" binding:"required,min=1"`
 	TransactionType string `json:"transaction_type" binding:"required,oneof=Income Expense income expense"`
 	Date            string `json:"date" binding:"required"`
+	TagIDs          []uint `json:"tag_ids,omitempty"`
 }
 
 // UpdateTransactionV2Request represents request to update transaction
@@ -38,6 +41,7 @@ type UpdateTransactionV2Request struct {
 	Amount          *int    `json:"amount"`
 	TransactionType *string `json:"transaction_type"`
 	Date            *string `json:"date"`
+	TagIDs          *[]uint `json:"tag_ids,omitempty"`
 }
 
 // AssetTransactionsResponse represents transactions for a specific asset
