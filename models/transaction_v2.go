@@ -27,4 +27,5 @@ type TransactionV2 struct {
 	Category Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
 	Bank     Bank     `gorm:"foreignKey:BankID" json:"bank,omitempty"`
 	Asset    Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	Tags     []Tag    `gorm:"many2many:transaction_tags;" json:"tags,omitempty"`
 }
