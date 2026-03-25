@@ -20,6 +20,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionV2Repo := repositories.NewTransactionV2Repository(config.DB)
 	tagRepo := repositories.NewTagRepository(config.DB)
 	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
+	emailSyncRepo := repositories.NewEmailSyncRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -31,6 +32,7 @@ func SetupRouter(router *gin.Engine) {
 	transactionV2Service := services.NewTransactionV2Service(transactionV2Repo, assetRepo, tagRepo)
 	tagService := services.NewTagService(tagRepo)
 	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
+	emailSyncService := services.NewEmailSyncService(emailSyncRepo, assetRepo, transactionV2Repo, config.DB)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -43,6 +45,10 @@ func SetupRouter(router *gin.Engine) {
 	assetController := controllers.NewAssetController(assetService)
 	tagController := controllers.NewTagController(tagService)
 	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
+	emailSyncController := controllers.NewEmailSyncController(emailSyncService)
+
+	// Public OAuth2 callback (no JWT required)
+	router.GET("/api/v2/email-sync/callback", emailSyncController.HandleCallback)
 
 	api := router.Group("/api")
 	{
@@ -105,6 +111,12 @@ func SetupRouter(router *gin.Engine) {
 
 			// Analytics endpoints
 			v2.GET("/analytics/spending-by-tag", tagController.GetSpendingByTag)
+
+			// Email sync endpoints
+			v2.GET("/email-sync/auth", emailSyncController.GetAuthURL)
+			v2.POST("/email-sync/sync", emailSyncController.SyncEmails)
+			v2.GET("/email-sync/status", emailSyncController.GetStatus)
+			v2.DELETE("/email-sync/disconnect", emailSyncController.Disconnect)
 		}
 
 		// Category routes
