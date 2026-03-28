@@ -676,6 +676,9 @@ func parseBCAEmail(subject, body string) (*parsedEmail, error) {
 	}, nil
 }
 
+// wib is the fixed timezone for all Indonesian bank emails (UTC+7).
+var wib = time.FixedZone("WIB", 7*3600)
+
 // parseBCADate parses "24 Mar 2026 18:08:10"
 func parseBCADate(raw string) (time.Time, error) {
 	formats := []string{
@@ -684,7 +687,7 @@ func parseBCADate(raw string) (time.Time, error) {
 		"2006-01-02 15:04:05",
 	}
 	for _, f := range formats {
-		if t, err := time.Parse(f, strings.TrimSpace(raw)); err == nil {
+		if t, err := time.ParseInLocation(f, strings.TrimSpace(raw), wib); err == nil {
 			return t, nil
 		}
 	}
@@ -753,7 +756,7 @@ func parsePermataDate(dateRaw, timeRaw string) (time.Time, error) {
 		"2/1/2006",
 	}
 	for _, f := range formats {
-		if t, err := time.Parse(f, strings.TrimSpace(combined)); err == nil {
+		if t, err := time.ParseInLocation(f, strings.TrimSpace(combined), wib); err == nil {
 			return t, nil
 		}
 	}
@@ -818,7 +821,7 @@ func parseSeaBankDate(raw string) (time.Time, error) {
 		"02 Jan 2006 15:04:05",
 	}
 	for _, f := range formats {
-		if t, err := time.Parse(f, strings.TrimSpace(raw)); err == nil {
+		if t, err := time.ParseInLocation(f, strings.TrimSpace(raw), wib); err == nil {
 			return t, nil
 		}
 	}
