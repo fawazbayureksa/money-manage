@@ -18,6 +18,7 @@ type TransactionV2Service interface {
 	GetAssetTransactions(assetID uint64, userID uint, page, limit int) (*dto.AssetTransactionsResponse, error)
 	AddTagsToTransaction(transactionID, userID uint, tagIDs []uint) error
 	RemoveTagFromTransaction(transactionID, userID, tagID uint) error
+	ReplaceTagsOnTransaction(transactionID, userID uint, tagIDs []uint) error
 }
 
 type transactionV2Service struct {
@@ -54,14 +55,23 @@ func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, sta
 			assetCurrency = t.Asset.Currency
 		}
 
+		categoryName := ""
+		if t.Category != nil {
+			categoryName = t.Category.CategoryName
+		}
+		bankName := ""
+		if t.Bank != nil {
+			bankName = t.Bank.BankName
+		}
+
 		transactionResponses[i] = dto.TransactionV2Response{
 			ID:              t.ID,
 			Description:     t.Description,
 			Amount:          t.Amount,
 			TransactionType: t.TransactionType,
 			Date:            t.Date,
-			CategoryName:    t.Category.CategoryName,
-			BankName:        t.Bank.BankName,
+			CategoryName:    categoryName,
+			BankName:        bankName,
 			AssetID:         t.AssetID,
 			AssetName:       assetName,
 			AssetType:       assetType,
@@ -104,14 +114,23 @@ func (s *transactionV2Service) GetTransactionByID(id, userID uint) (*dto.Transac
 		assetCurrency = transaction.Asset.Currency
 	}
 
+	catName := ""
+	if transaction.Category != nil {
+		catName = transaction.Category.CategoryName
+	}
+	bkName := ""
+	if transaction.Bank != nil {
+		bkName = transaction.Bank.BankName
+	}
+
 	response := &dto.TransactionV2Response{
 		ID:              transaction.ID,
 		Description:     transaction.Description,
 		Amount:          transaction.Amount,
 		TransactionType: transaction.TransactionType,
 		Date:            transaction.Date,
-		CategoryName:    transaction.Category.CategoryName,
-		BankName:        transaction.Bank.BankName,
+		CategoryName:    catName,
+		BankName:        bkName,
 		AssetID:         transaction.AssetID,
 		AssetName:       assetName,
 		AssetType:       assetType,
@@ -161,14 +180,23 @@ func (s *transactionV2Service) GetAssetTransactions(assetID uint64, userID uint,
 			totalExpense += float64(t.Amount)
 		}
 
+		assetCatName := ""
+		if t.Category != nil {
+			assetCatName = t.Category.CategoryName
+		}
+		assetBkName := ""
+		if t.Bank != nil {
+			assetBkName = t.Bank.BankName
+		}
+
 		transactionResponses[i] = dto.TransactionV2Response{
 			ID:              t.ID,
 			Description:     t.Description,
 			Amount:          t.Amount,
 			TransactionType: t.TransactionType,
 			Date:            t.Date,
-			CategoryName:    t.Category.CategoryName,
-			BankName:        t.Bank.BankName,
+			CategoryName:    assetCatName,
+			BankName:        assetBkName,
 			AssetID:         t.AssetID,
 			AssetName:       asset.Name,
 			AssetType:       asset.Type,
@@ -236,4 +264,17 @@ func (s *transactionV2Service) RemoveTagFromTransaction(transactionID, userID, t
 	}
 
 	return s.transactionRepo.RemoveTagFromTransaction(transactionID, tagID)
+}
+
+func (s *transactionV2Service) ReplaceTagsOnTransaction(transactionID, userID uint, tagIDs []uint) error {
+	_, err := s.transactionRepo.GetByID(transactionID, userID)
+	if err != nil {
+		return err
+	}
+	for _, tagID := range tagIDs {
+		if _, err := s.tagRepo.FindByID(tagID, userID); err != nil {
+			return errors.New("one or more tags not found or do not belong to you")
+		}
+	}
+	return s.transactionRepo.ReplaceTagsOnTransaction(transactionID, tagIDs)
 }

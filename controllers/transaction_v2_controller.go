@@ -179,12 +179,12 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	transaction := &models.TransactionV2{
 		UserID:          userIDUint,
 		Description:     req.Description,
-		CategoryID:      req.CategoryID,
+		CategoryID:      &req.CategoryID,
 		AssetID:         req.AssetID,
 		Amount:          req.Amount,
 		TransactionType: transactionType,
 		Date:            utils.CustomTime{Time: date},
-		BankID:          0, // Optional for v2
+		BankID:          nil,
 	}
 
 	if err := ctrl.transactionService.CreateTransaction(transaction); err != nil {
@@ -272,19 +272,19 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 		ID:              uint(id),
 		UserID:          userIDUint,
 		Description:     existing.Description,
-		CategoryID:      0,
+		CategoryID:      nil,
 		AssetID:         existing.AssetID,
 		Amount:          existing.Amount,
 		TransactionType: existing.TransactionType,
 		Date:            existing.Date,
-		BankID:          0,
+		BankID:          nil,
 	}
 
 	if req.Description != nil {
 		transaction.Description = *req.Description
 	}
 	if req.CategoryID != nil {
-		transaction.CategoryID = *req.CategoryID
+		transaction.CategoryID = req.CategoryID
 	}
 	if req.AssetID != nil {
 		transaction.AssetID = *req.AssetID
@@ -323,6 +323,14 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 	// Check budget alerts if transaction involves expenses (old or new type)
 	if transaction.TransactionType == 2 || oldType == 2 {
 		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+	}
+
+	// Replace tags if tag_ids was provided in the request
+	if req.TagIDs != nil {
+		if err := ctrl.transactionService.ReplaceTagsOnTransaction(uint(id), userIDUint, *req.TagIDs); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+			return
+		}
 	}
 
 	updated, _ := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)

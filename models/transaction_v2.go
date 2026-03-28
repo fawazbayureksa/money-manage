@@ -13,8 +13,8 @@ type TransactionV2 struct {
 	ID              uint             `gorm:"primaryKey;autoIncrement;type:int unsigned" json:"id"`
 	Description     string           `gorm:"size:200;not null" json:"description"`
 	UserID          uint             `gorm:"not null;index;type:int unsigned" json:"user_id"`
-	CategoryID      uint             `gorm:"not null;index;type:int unsigned" json:"category_id"`
-	BankID          uint             `gorm:"index;type:int unsigned" json:"bank_id"`
+	CategoryID      *uint            `gorm:"index;type:int unsigned" json:"category_id"`
+	BankID          *uint            `gorm:"index;type:int unsigned" json:"bank_id"`
 	AssetID         uint64           `gorm:"not null;index;type:bigint unsigned" json:"asset_id"`
 	Amount          int              `gorm:"not null" json:"amount"`
 	TransactionType int              `gorm:"not null" json:"transaction_type"` // 1=income, 2=expense
@@ -24,8 +24,8 @@ type TransactionV2 struct {
 
 	// Relations
 	User     User     `gorm:"foreignKey:UserID" json:"-"`
-	Category Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Bank     Bank     `gorm:"foreignKey:BankID" json:"bank,omitempty"`
+	Category *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Bank     *Bank    `gorm:"foreignKey:BankID" json:"bank,omitempty"`
 	Asset    Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
-	Tags     []Tag    `gorm:"many2many:transaction_tags;" json:"tags,omitempty"`
+	Tags     []Tag    `gorm:"many2many:transaction_tags;joinForeignKey:TransactionID;joinReferences:TagID" json:"tags,omitempty"`
 }

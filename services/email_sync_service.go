@@ -240,12 +240,12 @@ func (s *emailSyncService) createTransaction(userID uint, p *parsedEmail, assetI
 	tx := &models.TransactionV2{
 		UserID:          userID,
 		Description:     p.description,
-		CategoryID:      0,
+		CategoryID:      nil,
 		AssetID:         assetID,
 		Amount:          p.amount,
 		TransactionType: 2, // expenses by default
 		Date:            utils.CustomTime{Time: p.date},
-		BankID:          0,
+		BankID:          nil,
 	}
 
 	if assetID > 0 {
@@ -528,6 +528,41 @@ func extractField(text, key string) string {
 	return strings.TrimSpace(m[1])
 }
 
+// extractSeaBankCell handles SeaBank's HTML table format where key and value are in
+// separate <td> cells with no colon separator. After HTML stripping the body becomes
+// a flat string like "Jumlah IDR 50.000 Biaya Rp1.000 ...". This function tries the
+// standard colon-based extractField first, then falls back to a boundary-based match
+// using the provided sibling field names to delimit the captured value.
+func extractSeaBankCell(text, key string, allKeys []string) string {
+	if v := extractField(text, key); v != "" {
+		return v
+	}
+	// Find the key in the text (case-insensitive)
+	lowerText := strings.ToLower(text)
+	lowerKey := strings.ToLower(key)
+	keyIdx := strings.Index(lowerText, lowerKey)
+	if keyIdx < 0 {
+		return ""
+	}
+	// Start after the key (and any trailing colon/spaces)
+	start := keyIdx + len(key)
+	for start < len(text) && (text[start] == ':' || text[start] == ' ' || text[start] == '\t' || text[start] == '\n' || text[start] == '\r') {
+		start++
+	}
+	// Find the earliest next field boundary after start
+	end := len(text)
+	for _, other := range allKeys {
+		if strings.EqualFold(other, key) {
+			continue
+		}
+		idx := strings.Index(strings.ToLower(text[start:]), strings.ToLower(other))
+		if idx >= 0 && start+idx < end {
+			end = start + idx
+		}
+	}
+	return strings.TrimSpace(text[start:end])
+}
+
 // parseAmount converts Indonesian/standard currency strings to integer IDR.
 // Examples: "IDR 138,600.00" → 138600, "34,500" → 34500, "IDR 50.000" → 50000
 func parseAmount(raw string) (int, error) {
@@ -662,9 +697,11 @@ func parseBCADate(raw string) (time.Time, error) {
 func parsePermataEmail(subject, body string) (*parsedEmail, error) {
 	// Only successful
 	status := extractField(body, "Status Transaksi")
-	if status != "" && !strings.Contains(strings.ToLower(status), "sukses") &&
-		!strings.Contains(strings.ToLower(status), "success") {
-		return nil, fmt.Errorf("Permata: skipping non-successful transaction (status: %s)", status)
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "sukses") && !strings.Contains(s, "success") && !strings.Contains(s, "berhasil") {
+			return nil, fmt.Errorf("Permata: skipping non-successful transaction (status: %s)", status)
+		}
 	}
 
 	// Amount
@@ -726,11 +763,21 @@ func parsePermataDate(dateRaw, timeRaw string) (time.Time, error) {
 // SeaBank email parser
 // Subject: "Notifikasi Top Up e-Wallet di SeaBank" | other SeaBank notifications
 // From: alerts@seabank.co.id
+//
+// SeaBank emails are HTML tables with key and value in separate <td> cells.
+// Many rows have no colon, so extractField won't find them. We use extractSeaBankCell
+// with explicit sibling field names as value boundaries.
 func parseSeaBankEmail(subject, body string) (*parsedEmail, error) {
+	// SeaBank known table field names (used as boundaries when extracting table cells)
+	seaBankFields := []string{
+		"Waktu Transaksi", "Jenis Transaksi", "Transfer Dari",
+		"Rekening Tujuan", "Jumlah", "Biaya", "No. Referensi", "Catatan",
+	}
+
 	// Amount
-	amountRaw := extractField(body, "Jumlah")
+	amountRaw := extractSeaBankCell(body, "Jumlah", seaBankFields)
 	if amountRaw == "" {
-		amountRaw = extractField(body, "Nominal")
+		amountRaw = extractSeaBankCell(body, "Nominal", seaBankFields)
 	}
 	amount, err := parseAmount(amountRaw)
 	if err != nil {
@@ -738,19 +785,19 @@ func parseSeaBankEmail(subject, body string) (*parsedEmail, error) {
 	}
 
 	// Date
-	dateRaw := extractField(body, "Waktu Transaksi")
+	dateRaw := extractSeaBankCell(body, "Waktu Transaksi", seaBankFields)
 	txDate, err := parseSeaBankDate(dateRaw)
 	if err != nil {
 		txDate = time.Now()
 	}
 
 	// Description
-	txType := extractField(body, "Jenis Transaksi")
-	destination := extractField(body, "Rekening Tujuan")
+	txType := extractSeaBankCell(body, "Jenis Transaksi", seaBankFields)
+	destination := extractSeaBankCell(body, "Rekening Tujuan", seaBankFields)
 	desc := buildDescription("SeaBank", txType, destination)
 
 	// Account suffix for asset matching
-	transferDari := extractField(body, "Transfer Dari")
+	transferDari := extractSeaBankCell(body, "Transfer Dari", seaBankFields)
 	suffix := parseAccountSuffix(transferDari)
 
 	return &parsedEmail{
