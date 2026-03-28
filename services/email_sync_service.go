@@ -182,7 +182,7 @@ func (s *emailSyncService) SyncEmails(userID uint) (*SyncResult, error) {
 
 	result := &SyncResult{}
 
-	messageIDs, err := listGmailMessages(httpClient, knownBankQuery, 100)
+	messageIDs, err := listGmailMessages(httpClient, knownBankQuery, 300)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list gmail messages: %w", err)
 	}
@@ -633,8 +633,10 @@ func matchAsset(assets []models.Asset, suffix string) uint64 {
 func parseBCAEmail(subject, body string) (*parsedEmail, error) {
 	// Only process successful transactions
 	status := extractField(body, "Status")
-	if !strings.Contains(strings.ToLower(status), "successful") &&
-		!strings.Contains(strings.ToLower(status), "sukses") {
+	s := strings.ToLower(status)
+	if !strings.Contains(s, "successful") &&
+		!strings.Contains(s, "sukses") &&
+		!strings.Contains(s, "berhasil") {
 		return nil, fmt.Errorf("BCA: skipping non-successful transaction (status: %s)", status)
 	}
 
