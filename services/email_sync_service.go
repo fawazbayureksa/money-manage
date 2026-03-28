@@ -237,10 +237,11 @@ func (s *emailSyncService) SyncEmails(userID uint) (*SyncResult, error) {
 
 // createTransaction inserts a new transaction (with or without balance update).
 func (s *emailSyncService) createTransaction(userID uint, p *parsedEmail, assetID uint64) (uint, error) {
+	categoryID := s.findCategoryID(userID, p.categoryHint)
 	tx := &models.TransactionV2{
 		UserID:          userID,
 		Description:     p.description,
-		CategoryID:      nil,
+		CategoryID:      categoryID,
 		AssetID:         assetID,
 		Amount:          p.amount,
 		TransactionType: 2, // expenses by default
@@ -470,7 +471,8 @@ func getGmailMessage(client *http.Client, id string) (*gmailMessage, error) {
 // ----- HTML stripping -----
 
 // knownBankQuery is the Gmail search query for known bank transaction emails.
-const knownBankQuery = "category:purchases from:(bca@bca.co.id OR contact.center@permatabank.co.id OR alerts@seabank.co.id)"
+// It covers major Indonesian banks and e-wallets.
+const knownBankQuery = "from:(@bca.co.id OR @permatabank.co.id OR @seabank.co.id OR @bankmandiri.co.id OR @bri.co.id OR @bni.co.id OR @cimbniaga.co.id OR @jenius.com OR @gojek.com OR @gopay.co.id OR @ovo.id OR @dana.id)"
 
 var (
 	reTags     = regexp.MustCompile(`<[^>]+>`)
@@ -500,18 +502,145 @@ type parsedEmail struct {
 	amount        int
 	date          time.Time
 	accountSuffix string // last visible digits of the source account
+	categoryHint  string // suggested category name for auto-assignment
+}
+
+// categoryRule maps a category name to a list of matching keywords (lowercase).
+type categoryRule struct {
+	name     string
+	keywords []string
+}
+
+// categoryRules defines the keyword-based category detection rules.
+// Rules are evaluated in order; the first match wins.
+var categoryRules = []categoryRule{
+	{"Food & Beverage", []string{
+		"food", "makan", "restoran", "restaurant", "warung", "cafe", "kafe",
+		"bakery", "pizza", "burger", "sushi", "mie", "nasi", "ayam", "bebek",
+		"coffee", "kopi", "minuman", "kuliner", "gofood", "shopeefood",
+		"grabfood", "kfc", "mcdonald", "starbucks", "hokben", "jco", "dunkin",
+	}},
+	{"Transportation", []string{
+		"ojek", "taxi", "grab", "gojek", "maxim", "busway", "transjakarta",
+		"mrt", "lrt", "kereta", "parkir", "parking", "toll", "tol",
+		"bensin", "bbm", "pertamina", "shell", "spbu", "tiket pesawat",
+		"pesawat", "bus", "damri",
+	}},
+	{"Shopping", []string{
+		"shopee", "tokopedia", "lazada", "blibli", "bukalapak",
+		"alfamart", "indomaret", "supermarket", "hypermart", "carrefour",
+		"transmart", "toko", "belanja", "market", "shop", "store",
+		"giant", "lottemart", "aeon", "ikea",
+	}},
+	{"Bills & Utilities", []string{
+		"pln", "pdam", "telkom", "indosat", "xl", "axis", "three", "tri",
+		"internet", "listrik", "electricity", "air minum", "token",
+		"tagihan", "bill", "utility", "bpjs", "iuran", "cicilan",
+		"angsuran", "premi", "asuransi",
+	}},
+	{"Entertainment", []string{
+		"netflix", "spotify", "youtube premium", "disney", "hbo",
+		"bioskop", "cgv", "cinepolis", "cinema", "game", "steam",
+		"hiburan", "playstation", "xbox", "prime video", "vidio",
+	}},
+	{"Health", []string{
+		"apotek", "pharmacy", "farmasi", "kimia farma", "guardian",
+		"century", "klinik", "clinic", "rumah sakit", "hospital",
+		"dokter", "doctor", "dental", "kesehatan", "halodoc", "alodokter",
+	}},
+	{"Education", []string{
+		"buku", "kampus", "universitas", "sekolah", "pendidikan",
+		"education", "kursus", "course", "les", "ruangguru", "zenius",
+		"duolingo", "udemy",
+	}},
+	{"Transfer", []string{
+		"transfer", "kirim uang", "top up", "topup", "isi ulang",
+		"virtual account", "va payment",
+	}},
+}
+
+// suggestCategoryHint returns a category name based on keyword matching across the
+// bank name, transaction type, target, and description fields.
+func suggestCategoryHint(txType, target, description string) string {
+	text := strings.ToLower(txType + " " + target + " " + description)
+	for _, rule := range categoryRules {
+		for _, kw := range rule.keywords {
+			if strings.Contains(text, kw) {
+				return rule.name
+			}
+		}
+	}
+	return ""
+}
+
+// escapeLike escapes SQL LIKE special characters (%, _, \) in a search term
+// so that they are treated as literal characters rather than pattern wildcards.
+func escapeLike(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `%`, `\%`)
+	s = strings.ReplaceAll(s, `_`, `\_`)
+	return s
+}
+
+// findCategoryID looks up a user's categories and returns the ID of the best match
+// for the given hint string. Returns nil if no match is found.
+func (s *emailSyncService) findCategoryID(userID uint, hint string) *uint {
+	if hint == "" {
+		return nil
+	}
+	lower := strings.ToLower(hint)
+	escaped := escapeLike(lower)
+	var category models.Category
+	// Exact case-insensitive match
+	if err := s.db.Where("user_id = ? AND LOWER(category_name) = ?", userID, lower).First(&category).Error; err == nil {
+		id := category.ID
+		return &id
+	}
+	// Partial match: hint contained within category name
+	if err := s.db.Where("user_id = ? AND LOWER(category_name) LIKE ? ESCAPE '\\'", userID, "%"+escaped+"%").First(&category).Error; err == nil {
+		id := category.ID
+		return &id
+	}
+	// Word-by-word fallback: any significant word from the hint in a category name
+	for _, word := range strings.Fields(lower) {
+		if len(word) < 3 {
+			continue
+		}
+		escapedWord := escapeLike(word)
+		if err := s.db.Where("user_id = ? AND LOWER(category_name) LIKE ? ESCAPE '\\'", userID, "%"+escapedWord+"%").First(&category).Error; err == nil {
+			id := category.ID
+			return &id
+		}
+	}
+	return nil
 }
 
 func parseEmailTransaction(subject, fromEmail, body string) (*parsedEmail, error) {
 	from := strings.ToLower(fromEmail)
 
 	switch {
-	case strings.Contains(from, "bca@bca.co.id") || strings.Contains(from, "bca.co.id"):
+	case strings.Contains(from, "@bca.co.id"):
 		return parseBCAEmail(subject, body)
-	case strings.Contains(from, "permatabank.co.id"):
+	case strings.Contains(from, "@permatabank.co.id"):
 		return parsePermataEmail(subject, body)
-	case strings.Contains(from, "seabank.co.id"):
+	case strings.Contains(from, "@seabank.co.id"):
 		return parseSeaBankEmail(subject, body)
+	case strings.Contains(from, "@bankmandiri.co.id"):
+		return parseMandiriEmail(subject, body)
+	case strings.Contains(from, "@bri.co.id"):
+		return parseBRIEmail(subject, body)
+	case strings.Contains(from, "@bni.co.id"):
+		return parseBNIEmail(subject, body)
+	case strings.Contains(from, "@cimbniaga.co.id"):
+		return parseCIMBEmail(subject, body)
+	case strings.Contains(from, "@jenius.com"):
+		return parseJeniusEmail(subject, body)
+	case strings.Contains(from, "@gojek.com") || strings.Contains(from, "@gopay.co.id"):
+		return parseGopayEmail(subject, body)
+	case strings.Contains(from, "@ovo.id"):
+		return parseOVOEmail(subject, body)
+	case strings.Contains(from, "@dana.id"):
+		return parseDANAEmail(subject, body)
 	default:
 		return nil, fmt.Errorf("unknown sender: %s", fromEmail)
 	}
@@ -629,7 +758,7 @@ func matchAsset(assets []models.Asset, suffix string) uint64 {
 
 // BCA email parser
 // Subject: "Internet Transaction Journal" | "Cash Withdrawal Successful"
-// From: bca@bca.co.id
+// From: *@bca.co.id
 func parseBCAEmail(subject, body string) (*parsedEmail, error) {
 	// Only process successful transactions
 	status := extractField(body, "Status")
@@ -669,12 +798,15 @@ func parseBCAEmail(subject, body string) (*parsedEmail, error) {
 	sourceOfFund := extractField(body, "Source of Fund")
 	suffix := parseAccountSuffix(sourceOfFund)
 
+	hint := suggestCategoryHint(txType, paymentTo, desc)
+
 	return &parsedEmail{
 		bankName:      "BCA",
 		description:   desc,
 		amount:        amount,
 		date:          txDate,
 		accountSuffix: suffix,
+		categoryHint:  hint,
 	}, nil
 }
 
@@ -698,7 +830,7 @@ func parseBCADate(raw string) (time.Time, error) {
 
 // Permata ME email parser
 // Subject: "Permata ME : QR Pay" | "Permata ME : Payment - Virtual Account"
-// From: contact.center@permatabank.co.id
+// From: *@permatabank.co.id
 func parsePermataEmail(subject, body string) (*parsedEmail, error) {
 	// Only successful
 	status := extractField(body, "Status Transaksi")
@@ -739,12 +871,19 @@ func parsePermataEmail(subject, body string) (*parsedEmail, error) {
 	rekeningAsal := extractField(body, "Rekening Asal")
 	suffix := parseAccountSuffix(rekeningAsal)
 
+	// Use email's own category field first, then fall back to keyword detection
+	hint := category
+	if hint == "" {
+		hint = suggestCategoryHint(category, merchant, desc)
+	}
+
 	return &parsedEmail{
 		bankName:      "Permata",
 		description:   desc,
 		amount:        amount,
 		date:          txDate,
 		accountSuffix: suffix,
+		categoryHint:  hint,
 	}, nil
 }
 
@@ -767,7 +906,7 @@ func parsePermataDate(dateRaw, timeRaw string) (time.Time, error) {
 
 // SeaBank email parser
 // Subject: "Notifikasi Top Up e-Wallet di SeaBank" | other SeaBank notifications
-// From: alerts@seabank.co.id
+// From: *@seabank.co.id
 //
 // SeaBank emails are HTML tables with key and value in separate <td> cells.
 // Many rows have no colon, so extractField won't find them. We use extractSeaBankCell
@@ -805,12 +944,15 @@ func parseSeaBankEmail(subject, body string) (*parsedEmail, error) {
 	transferDari := extractSeaBankCell(body, "Transfer Dari", seaBankFields)
 	suffix := parseAccountSuffix(transferDari)
 
+	hint := suggestCategoryHint(txType, destination, desc)
+
 	return &parsedEmail{
 		bankName:      "SeaBank",
 		description:   desc,
 		amount:        amount,
 		date:          txDate,
 		accountSuffix: suffix,
+		categoryHint:  hint,
 	}, nil
 }
 
@@ -846,4 +988,553 @@ func buildDescription(bank, txType, target string) string {
 		desc = desc[:200]
 	}
 	return desc
+}
+
+// ----- Mandiri (Livin' by Mandiri) -----
+// From: *@bankmandiri.co.id
+// Common subjects: "Notifikasi Transaksi", "Transaksi Berhasil"
+func parseMandiriEmail(subject, body string) (*parsedEmail, error) {
+	status := extractField(body, "Status")
+	if status == "" {
+		status = extractField(body, "Keterangan")
+	}
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") && !strings.Contains(s, "success") {
+			return nil, fmt.Errorf("Mandiri: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Nominal")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Jumlah")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("Mandiri: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Tanggal")
+	timeRaw := extractField(body, "Waktu")
+	txDate, err := parsePermataDate(dateRaw, timeRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	if txType == "" {
+		txType = extractField(body, "Tipe Transaksi")
+	}
+	target := extractField(body, "Ke Rekening")
+	if target == "" {
+		target = extractField(body, "Rekening Tujuan")
+	}
+	if target == "" {
+		target = extractField(body, "Ke Merchant")
+	}
+	if target == "" {
+		target = extractField(body, "Tujuan")
+	}
+	desc := buildDescription("Mandiri", txType, target)
+
+	sourceRaw := extractField(body, "Dari Rekening")
+	if sourceRaw == "" {
+		sourceRaw = extractField(body, "Rekening Asal")
+	}
+	suffix := parseAccountSuffix(sourceRaw)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "Mandiri",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: suffix,
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- BRI (BRImo) -----
+// From: *@bri.co.id
+// Common subjects: "Notifikasi Transaksi BRImo", "BRI Notifikasi"
+func parseBRIEmail(subject, body string) (*parsedEmail, error) {
+	status := extractField(body, "Status")
+	if status == "" {
+		status = extractField(body, "Keterangan")
+	}
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") && !strings.Contains(s, "success") {
+			return nil, fmt.Errorf("BRI: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Nominal")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Jumlah")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("BRI: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Tanggal")
+	timeRaw := extractField(body, "Waktu")
+	txDate, err := parsePermataDate(dateRaw, timeRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	target := extractField(body, "Rekening Tujuan")
+	if target == "" {
+		target = extractField(body, "Tujuan")
+	}
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	desc := buildDescription("BRI", txType, target)
+
+	sourceRaw := extractField(body, "Rekening Asal")
+	if sourceRaw == "" {
+		sourceRaw = extractField(body, "Dari Rekening")
+	}
+	suffix := parseAccountSuffix(sourceRaw)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "BRI",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: suffix,
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- BNI (BNI Mobile Banking) -----
+// From: *@bni.co.id
+// Common subjects: "Notifikasi BNI Mobile Banking", "Transaksi BNI"
+func parseBNIEmail(subject, body string) (*parsedEmail, error) {
+	status := extractField(body, "Status")
+	if status == "" {
+		status = extractField(body, "Keterangan")
+	}
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") && !strings.Contains(s, "success") {
+			return nil, fmt.Errorf("BNI: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Nominal")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Jumlah")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("BNI: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Tanggal")
+	timeRaw := extractField(body, "Waktu")
+	txDate, err := parsePermataDate(dateRaw, timeRaw)
+	if err != nil {
+		// BNI may also use a combined datetime field
+		combined := extractField(body, "Tanggal & Waktu")
+		txDate, err = parsePermataDate(combined, "")
+		if err != nil {
+			txDate = time.Now()
+		}
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	target := extractField(body, "Rekening Tujuan")
+	if target == "" {
+		target = extractField(body, "Nama Tujuan")
+	}
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	desc := buildDescription("BNI", txType, target)
+
+	sourceRaw := extractField(body, "Rekening Asal")
+	if sourceRaw == "" {
+		sourceRaw = extractField(body, "Dari Rekening")
+	}
+	suffix := parseAccountSuffix(sourceRaw)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "BNI",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: suffix,
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- CIMB Niaga (OCTO Mobile) -----
+// From: *@cimbniaga.co.id
+// Common subjects: "Notifikasi Transaksi CIMB Niaga", "OCTO Transaction"
+func parseCIMBEmail(subject, body string) (*parsedEmail, error) {
+	status := extractField(body, "Status")
+	if status == "" {
+		status = extractField(body, "Status Transaksi")
+	}
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") &&
+			!strings.Contains(s, "success") && !strings.Contains(s, "approved") {
+			return nil, fmt.Errorf("CIMB: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Nominal")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Jumlah")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("CIMB: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Tanggal")
+	timeRaw := extractField(body, "Waktu")
+	txDate, err := parsePermataDate(dateRaw, timeRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	if txType == "" {
+		txType = extractField(body, "Tipe Transaksi")
+	}
+	target := extractField(body, "Rekening Tujuan")
+	if target == "" {
+		target = extractField(body, "Kepada")
+	}
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	desc := buildDescription("CIMB Niaga", txType, target)
+
+	sourceRaw := extractField(body, "Rekening Asal")
+	if sourceRaw == "" {
+		sourceRaw = extractField(body, "Dari Rekening")
+	}
+	suffix := parseAccountSuffix(sourceRaw)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "CIMB Niaga",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: suffix,
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- Jenius (BTPN) -----
+// From: *@jenius.com
+// Jenius emails are in English.
+// Common subjects: "You made a payment", "Transaction Notification"
+func parseJeniusEmail(subject, body string) (*parsedEmail, error) {
+	// Jenius may not always include a status field; check subject for keywords
+	lowerSubject := strings.ToLower(subject)
+	lowerBody := strings.ToLower(body)
+	if strings.Contains(lowerSubject, "failed") || strings.Contains(lowerSubject, "gagal") ||
+		strings.Contains(lowerBody, "transaction failed") {
+		return nil, fmt.Errorf("Jenius: non-successful transaction")
+	}
+
+	amountRaw := extractField(body, "Amount")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Nominal")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Jumlah")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("Jenius: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Date")
+	if dateRaw == "" {
+		dateRaw = extractField(body, "Tanggal")
+	}
+	timeRaw := extractField(body, "Time")
+	if timeRaw == "" {
+		timeRaw = extractField(body, "Waktu")
+	}
+	txDate, err := parseJeniusDate(dateRaw, timeRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Transaction Type")
+	if txType == "" {
+		txType = extractField(body, "Jenis Transaksi")
+	}
+	target := extractField(body, "To")
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	if target == "" {
+		target = extractField(body, "Recipient")
+	}
+	desc := buildDescription("Jenius", txType, target)
+
+	sourceRaw := extractField(body, "From Account")
+	if sourceRaw == "" {
+		sourceRaw = extractField(body, "Dari")
+	}
+	suffix := parseAccountSuffix(sourceRaw)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "Jenius",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: suffix,
+		categoryHint:  hint,
+	}, nil
+}
+
+// parseJeniusDate handles both English and Indonesian date formats used by Jenius.
+func parseJeniusDate(dateRaw, timeRaw string) (time.Time, error) {
+	combined := strings.TrimSpace(dateRaw + " " + timeRaw)
+	formats := []string{
+		"02/01/2006 15:04:05",
+		"2/1/2006 15:04:05",
+		"02/01/2006",
+		"2006-01-02 15:04:05",
+		"2006-01-02",
+		"2 Jan 2006 15:04:05",
+		"02 Jan 2006 15:04:05",
+		"2 Jan 2006",
+	}
+	for _, f := range formats {
+		if t, err := time.ParseInLocation(f, strings.TrimSpace(combined), wib); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("cannot parse Jenius date: %s %s", dateRaw, timeRaw)
+}
+
+// ----- GoPay -----
+// From: *@gojek.com or *@gopay.co.id
+// Common subjects: "Pembayaran Berhasil", "GoPay Transaction", "Notifikasi GoPay"
+func parseGopayEmail(subject, body string) (*parsedEmail, error) {
+	lowerSubject := strings.ToLower(subject)
+	if strings.Contains(lowerSubject, "gagal") || strings.Contains(lowerSubject, "failed") {
+		return nil, fmt.Errorf("GoPay: non-successful transaction (subject: %s)", subject)
+	}
+
+	status := extractField(body, "Status")
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") && !strings.Contains(s, "success") {
+			return nil, fmt.Errorf("GoPay: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Jumlah")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Total")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Nominal")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("GoPay: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Waktu")
+	if dateRaw == "" {
+		dateRaw = extractField(body, "Tanggal")
+	}
+	txDate, err := parseSeaBankDate(dateRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	if txType == "" {
+		txType = "GoPay Payment"
+	}
+	target := extractField(body, "Ke")
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	if target == "" {
+		target = extractField(body, "Tujuan")
+	}
+	desc := buildDescription("GoPay", txType, target)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "GoPay",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: "",
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- OVO -----
+// From: *@ovo.id
+// Common subjects: "OVO Payment Successful", "Transaksi OVO Berhasil"
+func parseOVOEmail(subject, body string) (*parsedEmail, error) {
+	lowerSubject := strings.ToLower(subject)
+	if strings.Contains(lowerSubject, "gagal") || strings.Contains(lowerSubject, "failed") {
+		return nil, fmt.Errorf("OVO: non-successful transaction (subject: %s)", subject)
+	}
+
+	status := extractField(body, "Status")
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") &&
+			!strings.Contains(s, "success") && !strings.Contains(s, "approved") {
+			return nil, fmt.Errorf("OVO: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Jumlah")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Total")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("OVO: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Waktu")
+	if dateRaw == "" {
+		dateRaw = extractField(body, "Tanggal")
+	}
+	txDate, err := parseSeaBankDate(dateRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	target := extractField(body, "Merchant")
+	if target == "" {
+		target = extractField(body, "Ke")
+	}
+	if target == "" {
+		target = extractField(body, "Recipient")
+	}
+	txType := extractField(body, "Jenis Transaksi")
+	if txType == "" {
+		txType = "OVO Payment"
+	}
+	desc := buildDescription("OVO", txType, target)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "OVO",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: "",
+		categoryHint:  hint,
+	}, nil
+}
+
+// ----- DANA -----
+// From: *@dana.id
+// Common subjects: "Pembayaran Berhasil", "DANA Transaction", "Notifikasi DANA"
+func parseDANAEmail(subject, body string) (*parsedEmail, error) {
+	lowerSubject := strings.ToLower(subject)
+	if strings.Contains(lowerSubject, "gagal") || strings.Contains(lowerSubject, "failed") {
+		return nil, fmt.Errorf("DANA: non-successful transaction (subject: %s)", subject)
+	}
+
+	status := extractField(body, "Status")
+	if status != "" {
+		s := strings.ToLower(status)
+		if !strings.Contains(s, "berhasil") && !strings.Contains(s, "sukses") && !strings.Contains(s, "success") {
+			return nil, fmt.Errorf("DANA: non-successful status: %s", status)
+		}
+	}
+
+	amountRaw := extractField(body, "Jumlah")
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Nominal")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Amount")
+	}
+	if amountRaw == "" {
+		amountRaw = extractField(body, "Total")
+	}
+	amount, err := parseAmount(amountRaw)
+	if err != nil {
+		return nil, fmt.Errorf("DANA: cannot parse amount %q: %w", amountRaw, err)
+	}
+
+	dateRaw := extractField(body, "Waktu Transaksi")
+	if dateRaw == "" {
+		dateRaw = extractField(body, "Waktu")
+	}
+	if dateRaw == "" {
+		dateRaw = extractField(body, "Tanggal")
+	}
+	txDate, err := parseSeaBankDate(dateRaw)
+	if err != nil {
+		txDate = time.Now()
+	}
+
+	txType := extractField(body, "Jenis Transaksi")
+	target := extractField(body, "Ke")
+	if target == "" {
+		target = extractField(body, "Merchant")
+	}
+	if target == "" {
+		target = extractField(body, "Tujuan")
+	}
+	desc := buildDescription("DANA", txType, target)
+
+	hint := suggestCategoryHint(txType, target, desc)
+
+	return &parsedEmail{
+		bankName:      "DANA",
+		description:   desc,
+		amount:        amount,
+		date:          txDate,
+		accountSuffix: "",
+		categoryHint:  hint,
+	}, nil
 }
