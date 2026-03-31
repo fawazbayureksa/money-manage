@@ -21,6 +21,7 @@ func SetupRouter(router *gin.Engine) {
 	tagRepo := repositories.NewTagRepository(config.DB)
 	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
 	emailSyncRepo := repositories.NewEmailSyncRepository(config.DB)
+	debtRepo := repositories.NewDebtRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -33,6 +34,7 @@ func SetupRouter(router *gin.Engine) {
 	tagService := services.NewTagService(tagRepo)
 	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
 	emailSyncService := services.NewEmailSyncService(emailSyncRepo, assetRepo, transactionV2Repo, config.DB)
+	debtService := services.NewDebtService(debtRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -46,6 +48,7 @@ func SetupRouter(router *gin.Engine) {
 	tagController := controllers.NewTagController(tagService)
 	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
 	emailSyncController := controllers.NewEmailSyncController(emailSyncService)
+	debtController := controllers.NewDebtController(debtService)
 
 	// Public OAuth2 callback (no JWT required)
 	router.GET("/api/v2/email-sync/callback", emailSyncController.HandleCallback)
@@ -158,5 +161,21 @@ func SetupRouter(router *gin.Engine) {
 		authorized.POST("/user/settings", userSettingsController.CreateUserSettings)
 		authorized.PUT("/user/settings", userSettingsController.UpdateUserSettings)
 		authorized.DELETE("/user/settings", userSettingsController.DeleteUserSettings)
+
+		// Debt tracker routes
+		authorized.POST("/debts", debtController.CreateDebt)
+		authorized.GET("/debts", debtController.GetDebts)
+		authorized.GET("/debts/summary", debtController.GetDebtSummary)
+		authorized.GET("/debts/strategies", debtController.GetPayoffStrategies)
+		authorized.GET("/debts/milestones", debtController.GetMilestones)
+		authorized.PUT("/debts/milestones/read-all", debtController.MarkAllMilestonesAsRead)
+		authorized.GET("/debts/:id", debtController.GetDebt)
+		authorized.PUT("/debts/:id", debtController.UpdateDebt)
+		authorized.DELETE("/debts/:id", debtController.DeleteDebt)
+		authorized.POST("/debts/:id/payments", debtController.RecordPayment)
+		authorized.GET("/debts/:id/payments", debtController.GetPayments)
+		authorized.DELETE("/debts/:id/payments/:payment_id", debtController.DeletePayment)
+		authorized.GET("/debts/:id/projection", debtController.GetPayoffProjection)
+		authorized.PUT("/debts/milestones/:id/read", debtController.MarkMilestoneAsRead)
 	}
 }
