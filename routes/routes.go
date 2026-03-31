@@ -21,6 +21,7 @@ func SetupRouter(router *gin.Engine) {
 	tagRepo := repositories.NewTagRepository(config.DB)
 	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
 	emailSyncRepo := repositories.NewEmailSyncRepository(config.DB)
+	savingsGoalRepo := repositories.NewSavingsGoalRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -33,6 +34,7 @@ func SetupRouter(router *gin.Engine) {
 	tagService := services.NewTagService(tagRepo)
 	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
 	emailSyncService := services.NewEmailSyncService(emailSyncRepo, assetRepo, transactionV2Repo, config.DB)
+	savingsGoalService := services.NewSavingsGoalService(savingsGoalRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -46,6 +48,7 @@ func SetupRouter(router *gin.Engine) {
 	tagController := controllers.NewTagController(tagService)
 	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
 	emailSyncController := controllers.NewEmailSyncController(emailSyncService)
+	savingsGoalController := controllers.NewSavingsGoalController(savingsGoalService)
 
 	// Public OAuth2 callback (no JWT required)
 	router.GET("/api/v2/email-sync/callback", emailSyncController.HandleCallback)
@@ -158,5 +161,15 @@ func SetupRouter(router *gin.Engine) {
 		authorized.POST("/user/settings", userSettingsController.CreateUserSettings)
 		authorized.PUT("/user/settings", userSettingsController.UpdateUserSettings)
 		authorized.DELETE("/user/settings", userSettingsController.DeleteUserSettings)
+
+		// Savings Goals routes
+		authorized.POST("/savings-goals", savingsGoalController.CreateGoal)
+		authorized.GET("/savings-goals", savingsGoalController.GetGoals)
+		authorized.GET("/savings-goals/:id", savingsGoalController.GetGoal)
+		authorized.PUT("/savings-goals/:id", savingsGoalController.UpdateGoal)
+		authorized.DELETE("/savings-goals/:id", savingsGoalController.DeleteGoal)
+		authorized.POST("/savings-goals/:id/contributions", savingsGoalController.AddContribution)
+		authorized.GET("/savings-goals/:id/contributions", savingsGoalController.GetContributions)
+		authorized.DELETE("/savings-goals/:id/contributions/:contribution_id", savingsGoalController.DeleteContribution)
 	}
 }
