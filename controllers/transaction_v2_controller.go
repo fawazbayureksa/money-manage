@@ -162,6 +162,12 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Validate: if no splits, category_id is required.
+	if len(req.Splits) == 0 && req.CategoryID == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "category_id is required when no splits are provided"})
+		return
+	}
+
 	date, err := time.Parse("2006-01-02", req.Date)
 	if err != nil {
 		date, err = time.Parse(time.RFC3339, req.Date)
@@ -179,7 +185,7 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	transaction := &models.TransactionV2{
 		UserID:          userIDUint,
 		Description:     req.Description,
-		CategoryID:      &req.CategoryID,
+		CategoryID:      req.CategoryID,
 		AssetID:         req.AssetID,
 		Amount:          req.Amount,
 		TransactionType: transactionType,
@@ -187,7 +193,11 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		BankID:          nil,
 	}
 
-	if err := ctrl.transactionService.CreateTransaction(transaction); err != nil {
+	if err := ctrl.transactionService.CreateTransaction(transaction, req.Splits); err != nil {
+		if err.Error() == "split amounts must sum to the transaction total amount" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+			return
+		}
 		if err.Error() == "insufficient balance" {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Insufficient balance in the selected asset"})
 			return
@@ -311,7 +321,11 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 		transaction.Date = utils.CustomTime{Time: date}
 	}
 
-	if err := ctrl.transactionService.UpdateTransaction(transaction, oldAmount, oldType); err != nil {
+	if err := ctrl.transactionService.UpdateTransaction(transaction, oldAmount, oldType, req.Splits); err != nil {
+		if err.Error() == "split amounts must sum to the transaction total amount" {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+			return
+		}
 		if err.Error() == "insufficient balance" {
 			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Insufficient balance in the selected asset"})
 			return

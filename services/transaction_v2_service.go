@@ -12,8 +12,8 @@ import (
 type TransactionV2Service interface {
 	GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error)
 	GetTransactionByID(id, userID uint) (*dto.TransactionV2Response, error)
-	CreateTransaction(transaction *models.TransactionV2) error
-	UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int) error
+	CreateTransaction(transaction *models.TransactionV2, splits []dto.SplitItem) error
+	UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int, splits *[]dto.SplitItem) error
 	DeleteTransaction(id, userID uint) error
 	GetAssetTransactions(assetID uint64, userID uint, page, limit int) (*dto.AssetTransactionsResponse, error)
 	AddTagsToTransaction(transactionID, userID uint, tagIDs []uint) error
@@ -78,6 +78,7 @@ func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, sta
 			AssetBalance:    assetBalance,
 			AssetCurrency:   assetCurrency,
 			Tags:            t.Tags,
+			Splits:          mapSplits(t.Splits),
 		}
 	}
 
@@ -137,16 +138,77 @@ func (s *transactionV2Service) GetTransactionByID(id, userID uint) (*dto.Transac
 		AssetBalance:    assetBalance,
 		AssetCurrency:   assetCurrency,
 		Tags:            transaction.Tags,
+		Splits:          mapSplits(transaction.Splits),
 	}
 
 	return response, nil
 }
 
-func (s *transactionV2Service) CreateTransaction(transaction *models.TransactionV2) error {
+// mapSplits converts model splits to DTO split responses.
+func mapSplits(splits []models.TransactionSplit) []dto.SplitItemResponse {
+	if len(splits) == 0 {
+		return nil
+	}
+	out := make([]dto.SplitItemResponse, len(splits))
+	for i, s := range splits {
+		catName := ""
+		if s.Category != nil {
+			catName = s.Category.CategoryName
+		}
+		out[i] = dto.SplitItemResponse{
+			ID:           s.ID,
+			CategoryID:   s.CategoryID,
+			CategoryName: catName,
+			Amount:       s.Amount,
+			Description:  s.Description,
+		}
+	}
+	return out
+}
+
+// buildModelSplits converts DTO split items to model splits for a given transaction.
+func buildModelSplits(splits []dto.SplitItem, transactionID uint) []models.TransactionSplit {
+	out := make([]models.TransactionSplit, len(splits))
+	for i, s := range splits {
+		out[i] = models.TransactionSplit{
+			TransactionID: transactionID,
+			CategoryID:    s.CategoryID,
+			Amount:        s.Amount,
+			Description:   s.Description,
+		}
+	}
+	return out
+}
+
+// validateSplits checks that splits are non-empty and their amounts sum to totalAmount.
+func validateSplits(splits []dto.SplitItem, totalAmount int) error {
+	sum := 0
+	for _, s := range splits {
+		sum += s.Amount
+	}
+	if sum != totalAmount {
+		return errors.New("split amounts must sum to the transaction total amount")
+	}
+	return nil
+}
+
+func (s *transactionV2Service) CreateTransaction(transaction *models.TransactionV2, splits []dto.SplitItem) error {
+	if len(splits) > 0 {
+		if err := validateSplits(splits, transaction.Amount); err != nil {
+			return err
+		}
+		transaction.Splits = buildModelSplits(splits, 0)
+	}
 	return s.transactionRepo.CreateWithBalanceUpdate(transaction)
 }
 
-func (s *transactionV2Service) UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int) error {
+func (s *transactionV2Service) UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int, splits *[]dto.SplitItem) error {
+	if splits != nil {
+		if err := validateSplits(*splits, transaction.Amount); err != nil {
+			return err
+		}
+		transaction.Splits = buildModelSplits(*splits, transaction.ID)
+	}
 	return s.transactionRepo.UpdateWithBalanceUpdate(transaction, oldAmount, oldType)
 }
 
@@ -203,6 +265,7 @@ func (s *transactionV2Service) GetAssetTransactions(assetID uint64, userID uint,
 			AssetBalance:    asset.Balance,
 			AssetCurrency:   asset.Currency,
 			Tags:            t.Tags,
+			Splits:          mapSplits(t.Splits),
 		}
 	}
 

@@ -41,18 +41,45 @@ func (r *analyticsRepository) GetTransactionsByDateRange(userID uint, startDate,
 func (r *analyticsRepository) GetSpendingByCategory(userID uint, startDate, endDate time.Time, transactionType int, assetID *uint64) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 
-	query := r.db.Table("transactions").
-		Select("categories.id as category_id, categories.category_name, SUM(transactions.amount) as total_amount, COUNT(*) as count").
-		Joins("JOIN categories ON transactions.category_id = categories.id").
-		Where("transactions.user_id = ? AND transactions.transaction_type = ? AND transactions.date BETWEEN ? AND ?",
-			userID, transactionType, startDate, endDate)
-	if assetID != nil {
-		query = query.Where("transactions.asset_id = ?", *assetID)
-	}
-	err := query.Group("categories.id, categories.category_name").
-		Order("total_amount DESC").
-		Scan(&results).Error
+	// Build optional asset filter fragments
+	assetFilter := ""
+	var args []interface{}
 
+	// Direct transactions (non-split)
+	args = append(args, userID, transactionType, startDate, endDate)
+	if assetID != nil {
+		assetFilter = " AND t.asset_id = ?"
+		args = append(args, *assetID)
+	}
+
+	// Split-transaction args (same set)
+	args = append(args, userID, transactionType, startDate, endDate)
+	if assetID != nil {
+		args = append(args, *assetID)
+	}
+
+	query := `
+		SELECT c.id AS category_id, c.category_name,
+		       SUM(combined.amount) AS total_amount,
+		       COUNT(*) AS count
+		FROM (
+			SELECT t.category_id AS category_id, t.amount
+			FROM transactions t
+			WHERE t.user_id = ? AND t.transaction_type = ? AND t.date BETWEEN ? AND ?` +
+		assetFilter + `
+			UNION ALL
+			SELECT ts.category_id, ts.amount
+			FROM transaction_splits ts
+			JOIN transactions t ON ts.transaction_id = t.id
+			WHERE t.user_id = ? AND t.transaction_type = ? AND t.date BETWEEN ? AND ?` +
+		assetFilter + `
+		) combined
+		JOIN categories c ON combined.category_id = c.id
+		GROUP BY c.id, c.category_name
+		ORDER BY total_amount DESC
+	`
+
+	err := r.db.Raw(query, args...).Scan(&results).Error
 	return results, err
 }
 
@@ -175,24 +202,39 @@ func (r *analyticsRepository) GetRecentTransactions(userID uint, limit int, asse
 func (r *analyticsRepository) GetCategoryTrend(userID uint, categoryID uint, startDate, endDate time.Time, assetID *uint64) ([]map[string]interface{}, error) {
 	var results []map[string]interface{}
 
-	query := `SELECT 
-		DATE(date) as date,
-		SUM(amount) as amount
-	FROM transactions
-	WHERE user_id = ? AND category_id = ? AND date BETWEEN ? AND ?`
-
+	assetFilter := ""
 	var args []interface{}
 	args = append(args, userID, categoryID, startDate, endDate)
-
 	if assetID != nil {
-		query += ` AND asset_id = ?`
+		assetFilter = " AND t.asset_id = ?"
 		args = append(args, *assetID)
 	}
 
-	query += ` GROUP BY DATE(date) ORDER BY date ASC`
+	// Duplicate args for the UNION ALL branch
+	args = append(args, userID, categoryID, startDate, endDate)
+	if assetID != nil {
+		args = append(args, *assetID)
+	}
+
+	query := `
+		SELECT DATE(combined.date) AS date, SUM(combined.amount) AS amount
+		FROM (
+			SELECT t.date, t.amount
+			FROM transactions t
+			WHERE t.user_id = ? AND t.category_id = ? AND t.date BETWEEN ? AND ?` +
+		assetFilter + `
+			UNION ALL
+			SELECT t.date, ts.amount
+			FROM transaction_splits ts
+			JOIN transactions t ON ts.transaction_id = t.id
+			WHERE t.user_id = ? AND ts.category_id = ? AND t.date BETWEEN ? AND ?` +
+		assetFilter + `
+		) combined
+		GROUP BY DATE(combined.date)
+		ORDER BY date ASC
+	`
 
 	err := r.db.Raw(query, args...).Scan(&results).Error
-
 	return results, err
 }
 

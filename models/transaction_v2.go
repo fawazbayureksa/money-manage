@@ -23,9 +23,10 @@ type TransactionV2 struct {
 	UpdatedAt       utils.CustomTime `gorm:"autoUpdateTime;type:datetime" json:"updated_at"`
 
 	// Relations
-	User     User     `gorm:"foreignKey:UserID" json:"-"`
-	Category *Category `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
-	Bank     *Bank    `gorm:"foreignKey:BankID" json:"bank,omitempty"`
-	Asset    Asset    `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
-	Tags     []Tag    `gorm:"many2many:transaction_tags;joinForeignKey:TransactionID;joinReferences:TagID" json:"tags,omitempty"`
+	User     User              `gorm:"foreignKey:UserID" json:"-"`
+	Category *Category         `gorm:"foreignKey:CategoryID" json:"category,omitempty"`
+	Bank     *Bank             `gorm:"foreignKey:BankID" json:"bank,omitempty"`
+	Asset    Asset             `gorm:"foreignKey:AssetID" json:"asset,omitempty"`
+	Tags     []Tag             `gorm:"many2many:transaction_tags;joinForeignKey:TransactionID;joinReferences:TagID" json:"tags,omitempty"`
+	Splits   []TransactionSplit `gorm:"foreignKey:TransactionID" json:"splits,omitempty"`
 }

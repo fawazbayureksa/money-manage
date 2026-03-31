@@ -19,6 +19,9 @@ type TransactionV2Repository interface {
 	AddTagsToTransaction(transactionID uint, tagIDs []uint) error
 	RemoveTagFromTransaction(transactionID uint, tagID uint) error
 	ReplaceTagsOnTransaction(transactionID uint, tagIDs []uint) error
+	CreateSplits(tx interface{}, transactionID uint, splits []models.TransactionSplit) error
+	DeleteSplitsByTransactionID(transactionID uint) error
+	GetSplitsByTransactionID(transactionID uint) ([]models.TransactionSplit, error)
 }
 
 type transactionV2Repository struct {
@@ -59,6 +62,7 @@ func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate
 		Preload("Bank").
 		Preload("Asset").
 		Preload("Tags").
+		Preload("Splits.Category").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
@@ -74,6 +78,7 @@ func (r *transactionV2Repository) GetByID(id, userID uint) (*models.TransactionV
 		Preload("Bank").
 		Preload("Asset").
 		Preload("Tags").
+		Preload("Splits.Category").
 		Where("id = ? AND user_id = ?", id, userID).
 		First(&transaction).Error
 
@@ -113,7 +118,25 @@ func (r *transactionV2Repository) CreateWithBalanceUpdate(transaction *models.Tr
 			return err
 		}
 
-		return tx.Create(transaction).Error
+		// Omit Splits from the parent Create so GORM doesn't try to insert them here.
+		splits := transaction.Splits
+		transaction.Splits = nil
+		if err := tx.Create(transaction).Error; err != nil {
+			return err
+		}
+		transaction.Splits = splits
+
+		// Persist splits within the same transaction.
+		if len(splits) > 0 {
+			for i := range splits {
+				splits[i].TransactionID = transaction.ID
+			}
+			if err := tx.Create(&splits).Error; err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 
@@ -121,7 +144,10 @@ func (r *transactionV2Repository) UpdateWithBalanceUpdate(transaction *models.Tr
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		// No asset linked — just save without balance adjustment
 		if transaction.AssetID == 0 {
-			return tx.Omit("created_at").Save(transaction).Error
+			if err := tx.Omit("created_at").Save(transaction).Error; err != nil {
+				return err
+			}
+			return r.replaceSplitsInTx(tx, transaction.ID, transaction.Splits)
 		}
 
 		var asset models.Asset
@@ -154,8 +180,36 @@ func (r *transactionV2Repository) UpdateWithBalanceUpdate(transaction *models.Tr
 			return err
 		}
 
-		return tx.Omit("created_at").Save(transaction).Error
+		splits := transaction.Splits
+		transaction.Splits = nil
+		if err := tx.Omit("created_at").Save(transaction).Error; err != nil {
+			return err
+		}
+		transaction.Splits = splits
+
+		return r.replaceSplitsInTx(tx, transaction.ID, splits)
 	})
+}
+
+// replaceSplitsInTx deletes existing splits and inserts the new set within tx.
+// A nil splits slice means no replacement is performed (leave existing as-is).
+func (r *transactionV2Repository) replaceSplitsInTx(tx *gorm.DB, transactionID uint, splits []models.TransactionSplit) error {
+	if splits == nil {
+		return nil
+	}
+	if err := tx.Where("transaction_id = ?", transactionID).Delete(&models.TransactionSplit{}).Error; err != nil {
+		return err
+	}
+	if len(splits) > 0 {
+		for i := range splits {
+			splits[i].ID = 0
+			splits[i].TransactionID = transactionID
+		}
+		if err := tx.Create(&splits).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *transactionV2Repository) DeleteWithBalanceRollback(id, userID uint) error {
@@ -205,6 +259,7 @@ func (r *transactionV2Repository) GetByAssetID(assetID uint64, userID uint, page
 		Preload("Category").
 		Preload("Bank").
 		Preload("Tags").
+		Preload("Splits.Category").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
@@ -270,4 +325,23 @@ func (r *transactionV2Repository) RemoveTagFromTransaction(transactionID uint, t
 
 		return nil
 	})
+}
+
+func (r *transactionV2Repository) CreateSplits(_ interface{}, transactionID uint, splits []models.TransactionSplit) error {
+	for i := range splits {
+		splits[i].TransactionID = transactionID
+	}
+	return r.db.Create(&splits).Error
+}
+
+func (r *transactionV2Repository) DeleteSplitsByTransactionID(transactionID uint) error {
+	return r.db.Where("transaction_id = ?", transactionID).Delete(&models.TransactionSplit{}).Error
+}
+
+func (r *transactionV2Repository) GetSplitsByTransactionID(transactionID uint) ([]models.TransactionSplit, error) {
+	var splits []models.TransactionSplit
+	err := r.db.Preload("Category").
+		Where("transaction_id = ?", transactionID).
+		Find(&splits).Error
+	return splits, err
 }

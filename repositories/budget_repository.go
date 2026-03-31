@@ -103,11 +103,24 @@ func (r *budgetRepository) GetSpentAmount(budgetID uint, startDate, endDate time
 		return 0, err
 	}
 
+	// Sum direct transactions for this category plus split-transaction amounts
+	// attributed to this category within the date range.
 	var total int64
-	err := r.db.Model(&models.TransactionV2{}).
-		Where("user_id = ? AND category_id = ? AND transaction_type = ? AND date BETWEEN ? AND ?",
-			budget.UserID, budget.CategoryID, 2, startDate, endDate).
-		Select("COALESCE(SUM(amount), 0)").
+	err := r.db.Raw(`
+		SELECT COALESCE(SUM(amount), 0) FROM (
+			SELECT t.amount
+			FROM transactions t
+			WHERE t.user_id = ? AND t.category_id = ? AND t.transaction_type = 2
+			  AND t.date BETWEEN ? AND ?
+			UNION ALL
+			SELECT ts.amount
+			FROM transaction_splits ts
+			JOIN transactions t ON ts.transaction_id = t.id
+			WHERE t.user_id = ? AND ts.category_id = ? AND t.transaction_type = 2
+			  AND t.date BETWEEN ? AND ?
+		) combined
+	`, budget.UserID, budget.CategoryID, startDate, endDate,
+		budget.UserID, budget.CategoryID, startDate, endDate).
 		Scan(&total).Error
 
 	return int(total), err
