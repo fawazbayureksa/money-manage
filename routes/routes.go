@@ -21,6 +21,7 @@ func SetupRouter(router *gin.Engine) {
 	tagRepo := repositories.NewTagRepository(config.DB)
 	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
 	emailSyncRepo := repositories.NewEmailSyncRepository(config.DB)
+	recurringTransactionRepo := repositories.NewRecurringTransactionRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -33,6 +34,8 @@ func SetupRouter(router *gin.Engine) {
 	tagService := services.NewTagService(tagRepo)
 	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
 	emailSyncService := services.NewEmailSyncService(emailSyncRepo, assetRepo, transactionV2Repo, config.DB)
+	recurringTransactionService := services.NewRecurringTransactionService(recurringTransactionRepo)
+	cashFlowForecastService := services.NewCashFlowForecastService(recurringTransactionRepo, transactionV2Repo, assetRepo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -46,6 +49,8 @@ func SetupRouter(router *gin.Engine) {
 	tagController := controllers.NewTagController(tagService)
 	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
 	emailSyncController := controllers.NewEmailSyncController(emailSyncService)
+	recurringTransactionController := controllers.NewRecurringTransactionController(recurringTransactionService)
+	cashFlowForecastController := controllers.NewCashFlowForecastController(cashFlowForecastService)
 
 	// Public OAuth2 callback (no JWT required)
 	router.GET("/api/v2/email-sync/callback", emailSyncController.HandleCallback)
@@ -117,6 +122,17 @@ func SetupRouter(router *gin.Engine) {
 			v2.POST("/email-sync/sync", emailSyncController.SyncEmails)
 			v2.GET("/email-sync/status", emailSyncController.GetStatus)
 			v2.DELETE("/email-sync/disconnect", emailSyncController.Disconnect)
+
+			// Recurring transactions endpoints
+			v2.GET("/recurring-transactions", recurringTransactionController.GetAll)
+			v2.GET("/recurring-transactions/:id", recurringTransactionController.GetByID)
+			v2.POST("/recurring-transactions", recurringTransactionController.Create)
+			v2.PUT("/recurring-transactions/:id", recurringTransactionController.Update)
+			v2.DELETE("/recurring-transactions/:id", recurringTransactionController.Delete)
+
+			// Cash flow forecast endpoints
+			v2.GET("/cash-flow/forecast", cashFlowForecastController.GetForecast)
+			v2.POST("/cash-flow/scenarios", cashFlowForecastController.GetScenario)
 		}
 
 		// Category routes

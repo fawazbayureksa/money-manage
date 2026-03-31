@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS `recurring_transactions` (
+    `id`               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    `user_id`          INT UNSIGNED    NOT NULL,
+    `asset_id`         BIGINT UNSIGNED NOT NULL,
+    `category_id`      INT UNSIGNED    DEFAULT NULL,
+    `description`      VARCHAR(200)    NOT NULL,
+    `amount`           INT             NOT NULL,
+    `transaction_type` TINYINT         NOT NULL COMMENT '1=income, 2=expense',
+    `frequency`        VARCHAR(20)     NOT NULL COMMENT 'daily, weekly, bi_weekly, monthly, yearly',
+    `day_of_month`     TINYINT UNSIGNED DEFAULT NULL COMMENT 'For monthly: 1-31',
+    `day_of_week`      TINYINT UNSIGNED DEFAULT NULL COMMENT 'For weekly/bi_weekly: 0=Sunday, 6=Saturday',
+    `start_date`       DATE            NOT NULL,
+    `end_date`         DATE            DEFAULT NULL,
+    `next_occurrence`  DATE            NOT NULL,
+    `is_active`        TINYINT(1)      NOT NULL DEFAULT 1,
+    `created_at`       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    INDEX `idx_recurring_user_id` (`user_id`),
+    INDEX `idx_recurring_asset_id` (`asset_id`),
+    INDEX `idx_recurring_next_occurrence` (`next_occurrence`),
+    INDEX `idx_recurring_is_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

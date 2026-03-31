@@ -19,6 +19,7 @@ type TransactionV2Repository interface {
 	AddTagsToTransaction(transactionID uint, tagIDs []uint) error
 	RemoveTagFromTransaction(transactionID uint, tagID uint) error
 	ReplaceTagsOnTransaction(transactionID uint, tagIDs []uint) error
+	FindByDateRange(userID uint, from, to time.Time, assetID *uint64) ([]models.TransactionV2, error)
 }
 
 type transactionV2Repository struct {
@@ -270,4 +271,18 @@ func (r *transactionV2Repository) RemoveTagFromTransaction(transactionID uint, t
 
 		return nil
 	})
+}
+
+func (r *transactionV2Repository) FindByDateRange(userID uint, from, to time.Time, assetID *uint64) ([]models.TransactionV2, error) {
+	var transactions []models.TransactionV2
+
+	query := r.db.Model(&models.TransactionV2{}).
+		Where("user_id = ? AND date >= ? AND date <= ?", userID, from, to)
+
+	if assetID != nil {
+		query = query.Where("asset_id = ?", *assetID)
+	}
+
+	err := query.Find(&transactions).Error
+	return transactions, err
 }
