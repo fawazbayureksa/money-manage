@@ -141,6 +141,7 @@ func SetupRouter(router *gin.Engine) {
 		authorized.GET("/budget-alerts", budgetController.GetAlerts)
 		authorized.PUT("/budget-alerts/:id/read", budgetController.MarkAlertAsRead)
 		authorized.PUT("/budget-alerts/read-all", budgetController.MarkAllAlertsAsRead)
+		authorized.POST("/budget-alerts/generate-summary", budgetController.GenerateSummaries)
 
 		// Analytics routes
 		authorized.GET("/analytics/dashboard", analyticsController.GetDashboardSummary)

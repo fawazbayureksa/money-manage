@@ -23,6 +23,13 @@ type BudgetRepository interface {
 	GetUserAlertsPaginated(userID uint, filter *dto.AlertFilterRequest) ([]models.BudgetAlert, int64, error)
 	MarkAlertAsRead(alertID uint, userID uint) error
 	MarkAllAlertsAsRead(userID uint) error
+
+	// Smart Alert helpers
+	GetRecentAlertByBudgetAndType(budgetID uint, alertType string, since time.Time) (*models.BudgetAlert, error)
+	GetRecentAlertByUserAndType(userID uint, alertType string, since time.Time) (*models.BudgetAlert, error)
+	GetTopTransactionsForBudget(budget *models.Budget, limit int) ([]models.TransactionV2, error)
+	GetAverageCategoryTransactionAmount(userID uint, categoryID uint, since time.Time) (float64, error)
+	GetUsersWithActiveBudgets() ([]uint, error)
 }
 
 type budgetRepository struct {
@@ -148,6 +155,9 @@ func (r *budgetRepository) GetUserAlertsPaginated(userID uint, filter *dto.Alert
 	if filter.BudgetID != 0 {
 		query = query.Where("budget_id = ?", filter.BudgetID)
 	}
+	if filter.AlertType != "" {
+		query = query.Where("alert_type = ?", filter.AlertType)
+	}
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -174,4 +184,58 @@ func (r *budgetRepository) MarkAllAlertsAsRead(userID uint) error {
 	return r.db.Model(&models.BudgetAlert{}).
 		Where("user_id = ? AND is_read = ?", userID, false).
 		Update("is_read", true).Error
+}
+
+func (r *budgetRepository) GetRecentAlertByBudgetAndType(budgetID uint, alertType string, since time.Time) (*models.BudgetAlert, error) {
+	var alert models.BudgetAlert
+	err := r.db.Where("budget_id = ? AND alert_type = ? AND created_at >= ?", budgetID, alertType, since).
+		Order("created_at DESC").
+		First(&alert).Error
+	if err != nil {
+		return nil, err
+	}
+	return &alert, nil
+}
+
+func (r *budgetRepository) GetRecentAlertByUserAndType(userID uint, alertType string, since time.Time) (*models.BudgetAlert, error) {
+	var alert models.BudgetAlert
+	err := r.db.Where("user_id = ? AND alert_type = ? AND created_at >= ?", userID, alertType, since).
+		Order("created_at DESC").
+		First(&alert).Error
+	if err != nil {
+		return nil, err
+	}
+	return &alert, nil
+}
+
+func (r *budgetRepository) GetTopTransactionsForBudget(budget *models.Budget, limit int) ([]models.TransactionV2, error) {
+	var transactions []models.TransactionV2
+	err := r.db.Where(
+		"user_id = ? AND category_id = ? AND transaction_type = ? AND date BETWEEN ? AND ?",
+		budget.UserID, budget.CategoryID, 2, budget.StartDate.Time, budget.EndDate.Time,
+	).
+		Order("amount DESC").
+		Limit(limit).
+		Find(&transactions).Error
+	return transactions, err
+}
+
+func (r *budgetRepository) GetAverageCategoryTransactionAmount(userID uint, categoryID uint, since time.Time) (float64, error) {
+	var avg float64
+	err := r.db.Model(&models.TransactionV2{}).
+		Where("user_id = ? AND category_id = ? AND transaction_type = ? AND date >= ?",
+			userID, categoryID, 2, since).
+		Select("COALESCE(AVG(amount), 0)").
+		Scan(&avg).Error
+	return avg, err
+}
+
+func (r *budgetRepository) GetUsersWithActiveBudgets() ([]uint, error) {
+	var userIDs []uint
+	now := time.Now()
+	err := r.db.Model(&models.Budget{}).
+		Where("is_active = ? AND start_date <= ? AND end_date >= ?", true, now, now).
+		Distinct("user_id").
+		Pluck("user_id", &userIDs).Error
+	return userIDs, err
 }

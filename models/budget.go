@@ -4,6 +4,15 @@ import (
 	"my-api/utils"
 )
 
+// Alert type constants
+const (
+	AlertTypeThreshold    = "threshold"
+	AlertTypeVelocity     = "velocity"
+	AlertTypeDailySummary = "daily_summary"
+	AlertTypeWeeklyReport = "weekly_report"
+	AlertTypeAnomaly      = "anomaly"
+)
+
 type Budget struct {
 	ID          uint             `gorm:"primaryKey;autoIncrement;type:int unsigned" json:"id"`
 	UserID      uint             `gorm:"not null;index;type:int unsigned" json:"user_id"`
@@ -27,6 +36,7 @@ type BudgetAlert struct {
 	ID          uint             `gorm:"primaryKey;autoIncrement;type:int unsigned" json:"id"`
 	BudgetID    uint             `gorm:"not null;index;type:int unsigned" json:"budget_id"`
 	UserID      uint             `gorm:"not null;index;type:int unsigned" json:"user_id"`
+	AlertType   string           `gorm:"size:50;default:'threshold'" json:"alert_type"`
 	Percentage  int              `gorm:"not null" json:"percentage"`
 	SpentAmount int              `gorm:"not null" json:"spent_amount"`
 	Message     string           `gorm:"size:500" json:"message"`

@@ -218,6 +218,8 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	// Check budget alerts if this is an expense transaction
 	if transaction.TransactionType == 2 {
 		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+		ctrl.budgetService.CheckVelocityAlerts(userIDUint)
+		ctrl.budgetService.CheckAnomalyAlert(userIDUint, transaction)
 	}
 
 	created, _ := ctrl.transactionService.GetTransactionByID(transaction.ID, userIDUint)
@@ -323,6 +325,7 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 	// Check budget alerts if transaction involves expenses (old or new type)
 	if transaction.TransactionType == 2 || oldType == 2 {
 		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+		ctrl.budgetService.CheckVelocityAlerts(userIDUint)
 	}
 
 	// Replace tags if tag_ids was provided in the request

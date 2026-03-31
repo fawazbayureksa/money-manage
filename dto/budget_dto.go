@@ -55,6 +55,7 @@ type BudgetFilterRequest struct {
 type BudgetAlertResponse struct {
 	ID           uint      `json:"id"`
 	BudgetID     uint      `json:"budget_id"`
+	AlertType    string    `json:"alert_type"`
 	Percentage   int       `json:"percentage"`
 	SpentAmount  int       `json:"spent_amount"`
 	Message      string    `json:"message"`
@@ -67,6 +68,7 @@ type BudgetAlertResponse struct {
 
 type AlertFilterRequest struct {
 	PaginationRequest
-	UnreadOnly bool `form:"unread_only"`
-	BudgetID   uint `form:"budget_id"`
+	UnreadOnly bool   `form:"unread_only"`
+	BudgetID   uint   `form:"budget_id"`
+	AlertType  string `form:"alert_type"`
 }

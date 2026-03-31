@@ -272,3 +272,31 @@ func (ctrl *BudgetController) MarkAllAlertsAsRead(c *gin.Context) {
 
 	utils.JSONSuccess(c, "All alerts marked as read", nil)
 }
+
+// GenerateSummaries triggers the daily and weekly summary generation for the authenticated user.
+// Useful for testing; in production this is driven by the background scheduler.
+func (ctrl *BudgetController) GenerateSummaries(c *gin.Context) {
+	summaryType := c.Query("type") // "daily", "weekly", or empty for both
+
+	var dailyErr, weeklyErr error
+	if summaryType == "" || summaryType == "daily" {
+		dailyErr = ctrl.service.GenerateDailySummaries()
+	}
+	if summaryType == "" || summaryType == "weekly" {
+		weeklyErr = ctrl.service.GenerateWeeklyReports()
+	}
+
+	if dailyErr != nil || weeklyErr != nil {
+		msg := "Summary generation encountered errors"
+		if dailyErr != nil {
+			msg += ": daily: " + dailyErr.Error()
+		}
+		if weeklyErr != nil {
+			msg += ": weekly: " + weeklyErr.Error()
+		}
+		utils.JSONError(c, http.StatusInternalServerError, msg)
+		return
+	}
+
+	utils.JSONSuccess(c, "Summaries generated successfully", nil)
+}
