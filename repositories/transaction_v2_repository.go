@@ -19,7 +19,7 @@ type TransactionV2Repository interface {
 	AddTagsToTransaction(transactionID uint, tagIDs []uint) error
 	RemoveTagFromTransaction(transactionID uint, tagID uint) error
 	ReplaceTagsOnTransaction(transactionID uint, tagIDs []uint) error
-	CreateSplits(tx interface{}, transactionID uint, splits []models.TransactionSplit) error
+	CreateSplits(transactionID uint, splits []models.TransactionSplit) error
 	DeleteSplitsByTransactionID(transactionID uint) error
 	GetSplitsByTransactionID(transactionID uint) ([]models.TransactionSplit, error)
 }
@@ -327,7 +327,7 @@ func (r *transactionV2Repository) RemoveTagFromTransaction(transactionID uint, t
 	})
 }
 
-func (r *transactionV2Repository) CreateSplits(_ interface{}, transactionID uint, splits []models.TransactionSplit) error {
+func (r *transactionV2Repository) CreateSplits(transactionID uint, splits []models.TransactionSplit) error {
 	for i := range splits {
 		splits[i].TransactionID = transactionID
 	}

@@ -166,15 +166,16 @@ func mapSplits(splits []models.TransactionSplit) []dto.SplitItemResponse {
 	return out
 }
 
-// buildModelSplits converts DTO split items to model splits for a given transaction.
-func buildModelSplits(splits []dto.SplitItem, transactionID uint) []models.TransactionSplit {
+// buildModelSplits converts DTO split items to model splits.
+// TransactionID is intentionally left as 0 here because the repository layer
+// sets it after the parent transaction record has been created.
+func buildModelSplits(splits []dto.SplitItem) []models.TransactionSplit {
 	out := make([]models.TransactionSplit, len(splits))
 	for i, s := range splits {
 		out[i] = models.TransactionSplit{
-			TransactionID: transactionID,
-			CategoryID:    s.CategoryID,
-			Amount:        s.Amount,
-			Description:   s.Description,
+			CategoryID:  s.CategoryID,
+			Amount:      s.Amount,
+			Description: s.Description,
 		}
 	}
 	return out
@@ -197,7 +198,7 @@ func (s *transactionV2Service) CreateTransaction(transaction *models.Transaction
 		if err := validateSplits(splits, transaction.Amount); err != nil {
 			return err
 		}
-		transaction.Splits = buildModelSplits(splits, 0)
+		transaction.Splits = buildModelSplits(splits)
 	}
 	return s.transactionRepo.CreateWithBalanceUpdate(transaction)
 }
@@ -207,7 +208,7 @@ func (s *transactionV2Service) UpdateTransaction(transaction *models.Transaction
 		if err := validateSplits(*splits, transaction.Amount); err != nil {
 			return err
 		}
-		transaction.Splits = buildModelSplits(*splits, transaction.ID)
+		transaction.Splits = buildModelSplits(*splits)
 	}
 	return s.transactionRepo.UpdateWithBalanceUpdate(transaction, oldAmount, oldType)
 }
