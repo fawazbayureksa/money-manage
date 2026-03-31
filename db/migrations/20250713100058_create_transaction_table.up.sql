@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS transactions (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     description VARCHAR(200) NOT NULL,
-    bank_id INT NOT NULL,
-    category_id INT NOT NULL,
+    bank_id INT NULL,
+    category_id INT NULL,
     user_id INT NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
