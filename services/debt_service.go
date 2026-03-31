@@ -245,6 +245,25 @@ func (s *debtService) GetPayments(debtID uint, userID uint, filter *dto.DebtPaym
 }
 
 func (s *debtService) DeletePayment(paymentID uint, userID uint) error {
+	// Find the payment to get amount and debt ID
+	payment, err := s.repo.FindPaymentByID(paymentID, userID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("payment not found")
+		}
+		return err
+	}
+
+	// Restore the debt balance
+	debt, err := s.repo.FindByID(payment.DebtID, userID)
+	if err == nil {
+		debt.CurrentBalance += payment.Amount
+		if debt.CurrentBalance > 0 {
+			debt.IsActive = true
+		}
+		s.repo.Update(debt)
+	}
+
 	return s.repo.DeletePayment(paymentID, userID)
 }
 
@@ -526,44 +545,55 @@ func (s *debtService) checkMilestones(debt *models.Debt, userID uint) {
 	for _, target := range milestones {
 		if percentagePaid >= float64(target) {
 			// Check if milestone already exists
-			existing, err := s.repo.FindMilestoneByDebtAndTarget(debt.ID, "percentage_paid", target)
-			if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-				var message string
-				if target == 100 {
-					message = fmt.Sprintf("🎉 Congratulations! You've completely paid off '%s'!", debt.Name)
-				} else {
-					message = fmt.Sprintf("🎯 Great progress! You've paid off %d%% of '%s'!", target, debt.Name)
-				}
-
-				milestone := &models.DebtMilestone{
-					DebtID:        debt.ID,
-					UserID:        userID,
-					MilestoneType: "percentage_paid",
-					TargetValue:   target,
-					Message:       message,
-				}
-				s.repo.CreateMilestone(milestone)
-			} else if existing != nil {
+			_, err := s.repo.FindMilestoneByDebtAndTarget(debt.ID, "percentage_paid", target)
+			if err == nil {
+				// Milestone already exists, skip
 				continue
 			}
+			if !errors.Is(err, gorm.ErrRecordNotFound) {
+				// Unexpected error, skip
+				continue
+			}
+
+			// Milestone doesn't exist, create it
+			var message string
+			if target == 100 {
+				message = fmt.Sprintf("🎉 Congratulations! You've completely paid off '%s'!", debt.Name)
+			} else {
+				message = fmt.Sprintf("🎯 Great progress! You've paid off %d%% of '%s'!", target, debt.Name)
+			}
+
+			milestone := &models.DebtMilestone{
+				DebtID:        debt.ID,
+				UserID:        userID,
+				MilestoneType: "percentage_paid",
+				TargetValue:   target,
+				Message:       message,
+			}
+			s.repo.CreateMilestone(milestone)
 		}
 	}
 
 	// Debt-free milestone
 	if debt.CurrentBalance <= 0 {
-		existing, err := s.repo.FindMilestoneByDebtAndTarget(debt.ID, "debt_free", 0)
-		if err != nil && errors.Is(err, gorm.ErrRecordNotFound) {
-			milestone := &models.DebtMilestone{
-				DebtID:        debt.ID,
-				UserID:        userID,
-				MilestoneType: "debt_free",
-				TargetValue:   0,
-				Message:       fmt.Sprintf("🏆 You are now debt-free on '%s'! Total paid: %d", debt.Name, totalPaid),
-			}
-			s.repo.CreateMilestone(milestone)
-		} else if existing != nil {
+		_, err := s.repo.FindMilestoneByDebtAndTarget(debt.ID, "debt_free", 0)
+		if err == nil {
+			// Milestone already exists
 			return
 		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			// Unexpected error
+			return
+		}
+
+		milestone := &models.DebtMilestone{
+			DebtID:        debt.ID,
+			UserID:        userID,
+			MilestoneType: "debt_free",
+			TargetValue:   0,
+			Message:       fmt.Sprintf("🏆 You are now debt-free on '%s'! Total paid: %d", debt.Name, totalPaid),
+		}
+		s.repo.CreateMilestone(milestone)
 	}
 }
 
@@ -639,8 +669,9 @@ func (s *debtService) simulatePayoff(debts []models.Debt) (int, int) {
 		}
 
 		months++
-		extraBudget := 0.0
 
+		// First pass: accrue interest on all debts and collect freed-up budget from paid-off debts
+		extraBudget := 0.0
 		for i := range states {
 			if states[i].balance <= 0 {
 				extraBudget += states[i].minPayment
@@ -650,12 +681,20 @@ func (s *debtService) simulatePayoff(debts []models.Debt) (int, int) {
 			interest := states[i].balance * states[i].rate
 			totalInterest += interest
 			states[i].balance += interest
+		}
+
+		// Second pass: apply payments in priority order, cascading extra budget to first unpaid debt
+		extraApplied := false
+		for i := range states {
+			if states[i].balance <= 0 {
+				continue
+			}
 
 			payment := states[i].minPayment
-			if i == 0 {
-				// First debt in priority gets extra budget from paid-off debts
+			if !extraApplied {
+				// First unpaid debt in priority order gets extra budget
 				payment += extraBudget
-				extraBudget = 0
+				extraApplied = true
 			}
 
 			if payment > states[i].balance {

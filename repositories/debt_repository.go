@@ -18,6 +18,7 @@ type DebtRepository interface {
 
 	// Debt Payments
 	CreatePayment(payment *models.DebtPayment) error
+	FindPaymentByID(paymentID uint, userID uint) (*models.DebtPayment, error)
 	FindPaymentsByDebtID(debtID uint, userID uint, filter *dto.DebtPaymentFilterRequest) ([]models.DebtPayment, int64, error)
 	GetTotalPaid(debtID uint) (int, error)
 	GetTotalPaidForUser(userID uint) (int, error)
@@ -103,6 +104,12 @@ func (r *debtRepository) FindActiveDebts(userID uint) ([]models.Debt, error) {
 
 func (r *debtRepository) CreatePayment(payment *models.DebtPayment) error {
 	return r.db.Create(payment).Error
+}
+
+func (r *debtRepository) FindPaymentByID(paymentID uint, userID uint) (*models.DebtPayment, error) {
+	var payment models.DebtPayment
+	err := r.db.Where("id = ? AND user_id = ?", paymentID, userID).First(&payment).Error
+	return &payment, err
 }
 
 func (r *debtRepository) FindPaymentsByDebtID(debtID uint, userID uint, filter *dto.DebtPaymentFilterRequest) ([]models.DebtPayment, int64, error) {
