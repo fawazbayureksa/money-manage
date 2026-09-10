@@ -395,6 +395,9 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		AssetID:   assetID,
 	}
 	currentMonth, _ := s.GetIncomeVsExpense(userID, currentReq)
+	if currentMonth == nil {
+		currentMonth = &dto.IncomeVsExpenseResponse{}
+	}
 
 	// Last month
 	lastReq := &dto.AnalyticsRequest{
@@ -403,6 +406,9 @@ func (s *analyticsService) GetDashboardSummary(userID uint, startDate, endDate *
 		AssetID:   assetID,
 	}
 	lastMonth, _ := s.GetIncomeVsExpense(userID, lastReq)
+	if lastMonth == nil {
+		lastMonth = &dto.IncomeVsExpenseResponse{}
+	}
 
 	// Top categories
 	topCategories, _ := s.GetSpendingByCategory(userID, currentReq)
@@ -504,10 +510,10 @@ func (s *analyticsService) toTransactionResponses(transactions []models.Transact
 		categoryName := ""
 		bankName := ""
 		assetName := ""
-		if t.Category.ID > 0 {
+		if t.Category != nil && t.Category.ID > 0 {
 			categoryName = t.Category.CategoryName
 		}
-		if t.Bank.ID > 0 {
+		if t.Bank != nil && t.Bank.ID > 0 {
 			bankName = t.Bank.BankName
 		}
 		if t.Asset.ID > 0 {

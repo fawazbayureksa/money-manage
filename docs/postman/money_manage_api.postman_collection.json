@@ -1,0 +1,1168 @@
+{
+  "info": {
+    "_postman_id": "money-manage-api-collection",
+    "name": "Money Manage API",
+    "description": "Full Postman collection for the money-manage API.\n\n## Setup\n1. Set `base_url` to your server (default: `http://localhost:8080`)\n2. Run **Login** — the `auth_token` variable is saved automatically\n3. All protected requests use `{{auth_token}}` in the Authorization header\n\n## Email Sync Flow\n1. **GET** `/api/v2/email-sync/auth` → open the returned `auth_url` in a browser\n2. Google redirects to `/api/v2/email-sync/callback` automatically (no manual call needed)\n3. **POST** `/api/v2/email-sync/sync` → run a sync\n4. **GET** `/api/v2/email-sync/status` → view connection status and logs",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8080", "type": "string" },
+    { "key": "auth_token", "value": "", "type": "string" },
+    { "key": "user_id", "value": "1", "type": "string" },
+    { "key": "bank_id", "value": "1", "type": "string" },
+    { "key": "category_id", "value": "1", "type": "string" },
+    { "key": "transaction_id", "value": "1", "type": "string" },
+    { "key": "wallet_id", "value": "1", "type": "string" },
+    { "key": "budget_id", "value": "1", "type": "string" },
+    { "key": "tag_id", "value": "1", "type": "string" },
+    { "key": "alert_id", "value": "1", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "register"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"secret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.token) {",
+                  "  pm.collectionVariables.set('auth_token', json.data.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "login"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"secret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/logout",
+              "host": ["{{base_url}}"],
+              "path": ["api", "logout"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\",\n  \"password\": \"secret123\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "{{user_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Updated\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/users/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Banks",
+      "item": [
+        {
+          "name": "Get Banks",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/banks",
+              "host": ["{{base_url}}"],
+              "path": ["api", "banks"]
+            }
+          }
+        },
+        {
+          "name": "Create Bank",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/api/banks",
+              "host": ["{{base_url}}"],
+              "path": ["api", "banks"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"BCA\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Bank",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/banks/{{bank_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "banks", "{{bank_id}}"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Get My Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/my-categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "my-categories"]
+            }
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/categories",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Food & Drinks\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/categories/{{category_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "categories", "{{category_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Initial Data",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/transaction/initial-data",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transaction", "initial-data"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Transactions (V1 Legacy)",
+      "item": [
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions"]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions", "{{transaction_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/transaction",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transaction"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Lunch\",\n  \"amount\": 50000,\n  \"transaction_type\": 2,\n  \"category_id\": 1,\n  \"bank_id\": 1,\n  \"date\": \"2026-03-28\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/transactions/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "transactions", "{{transaction_id}}"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Transactions V2",
+      "item": [
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions", "{{transaction_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Lunch at warteg\",\n  \"amount\": 25000,\n  \"transaction_type\": 2,\n  \"category_id\": 1,\n  \"asset_id\": 1,\n  \"date\": \"2026-03-28\",\n  \"tag_ids\": []\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Transaction",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions", "{{transaction_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description\",\n  \"amount\": 30000\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "transactions", "{{transaction_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Transactions by Asset",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/assets/{{wallet_id}}/transactions?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "assets", "{{wallet_id}}", "transactions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Add Tags to Transaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}/tags",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "v2",
+                "transactions",
+                "{{transaction_id}}",
+                "tags"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tag_ids\": [1, 2]\n}"
+            }
+          }
+        },
+        {
+          "name": "Remove Tag from Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/transactions/{{transaction_id}}/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "api",
+                "v2",
+                "transactions",
+                "{{transaction_id}}",
+                "tags",
+                "{{tag_id}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Wallets (Assets)",
+      "item": [
+        {
+          "name": "List Wallets",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets"]
+            }
+          }
+        },
+        {
+          "name": "Get Wallet by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets/{{wallet_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets", "{{wallet_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Wallet Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets", "summary"]
+            }
+          }
+        },
+        {
+          "name": "Create Wallet",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"BCA Tahapan\",\n  \"account_no\": \"1234567817\",\n  \"balance\": 1000000,\n  \"type\": \"bank\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Wallet",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets/{{wallet_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets", "{{wallet_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"BCA Tahapan Updated\",\n  \"balance\": 1500000\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Wallet",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/wallets/{{wallet_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "wallets", "{{wallet_id}}"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Budgets",
+      "item": [
+        {
+          "name": "Get Budgets",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets"]
+            }
+          }
+        },
+        {
+          "name": "Get Budget Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Budget by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets/{{budget_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets", "{{budget_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Create Budget",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": 1,\n  \"amount\": 500000,\n  \"month\": 3,\n  \"year\": 2026\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Budget",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets/{{budget_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets", "{{budget_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 600000\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Budget",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budgets/{{budget_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budgets", "{{budget_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Budget Alerts",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budget-alerts",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budget-alerts"]
+            }
+          }
+        },
+        {
+          "name": "Mark Alert as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budget-alerts/{{alert_id}}/read",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budget-alerts", "{{alert_id}}", "read"]
+            }
+          }
+        },
+        {
+          "name": "Mark All Alerts as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/budget-alerts/read-all",
+              "host": ["{{base_url}}"],
+              "path": ["api", "budget-alerts", "read-all"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Tags",
+      "item": [
+        {
+          "name": "Get Tags",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"]
+            }
+          }
+        },
+        {
+          "name": "Get Tag by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Suggest Tags",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/suggest?q=food",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "suggest"],
+              "query": [{ "key": "q", "value": "food" }]
+            }
+          }
+        },
+        {
+          "name": "Create Tag",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"food\",\n  \"color\": \"#FF5733\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Tag",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"food & drinks\",\n  \"color\": \"#E74C3C\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Tag",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/tags/{{tag_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "tags", "{{tag_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Spending by Tag",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/analytics/spending-by-tag?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "analytics", "spending-by-tag"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/dashboard?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "dashboard"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Spending by Category",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/spending-by-category?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "spending-by-category"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Spending by Bank",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/spending-by-bank?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "spending-by-bank"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Spending by Asset",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/spending-by-asset?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "spending-by-asset"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Income vs Expense",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/income-vs-expense?month=3&year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "income-vs-expense"],
+              "query": [
+                { "key": "month", "value": "3" },
+                { "key": "year", "value": "2026" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Trend Analysis",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/trend?months=6",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "trend"],
+              "query": [{ "key": "months", "value": "6" }]
+            }
+          }
+        },
+        {
+          "name": "Monthly Comparison",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/monthly-comparison?year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "monthly-comparison"],
+              "query": [{ "key": "year", "value": "2026" }]
+            }
+          }
+        },
+        {
+          "name": "Yearly Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/yearly-report?year=2026",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "yearly-report"],
+              "query": [{ "key": "year", "value": "2026" }]
+            }
+          }
+        },
+        {
+          "name": "Category Trend",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/analytics/category-trend/{{category_id}}?months=6",
+              "host": ["{{base_url}}"],
+              "path": ["api", "analytics", "category-trend", "{{category_id}}"],
+              "query": [{ "key": "months", "value": "6" }]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "User Settings",
+      "item": [
+        {
+          "name": "Get User Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "settings"]
+            }
+          }
+        },
+        {
+          "name": "Create User Settings",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "settings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pay_cycle_type\": \"monthly\",\n  \"pay_day\": 25\n}"
+            }
+          }
+        },
+        {
+          "name": "Update User Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "settings"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pay_cycle_type\": \"monthly\",\n  \"pay_day\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete User Settings",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/user/settings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "user", "settings"]
+            }
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Email Sync (Gmail)",
+      "description": "OAuth2 Gmail integration for auto-importing bank transaction emails.\n\n**Flow:**\n1. Call **Get Auth URL** to get a Google login link\n2. Open the link in a browser — Google will redirect to the callback automatically\n3. Call **Sync Emails** to import transactions\n4. Call **Get Status** to see logs",
+      "item": [
+        {
+          "name": "Get Auth URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/email-sync/auth",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "email-sync", "auth"]
+            },
+            "description": "Returns a Google OAuth2 URL. Open it in a browser to grant Gmail access. After authorisation, Google redirects to the callback endpoint automatically."
+          }
+        },
+        {
+          "name": "OAuth Callback (Google redirect — do not call manually)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v2/email-sync/callback?code=AUTH_CODE&state=STATE",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "email-sync", "callback"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "AUTH_CODE",
+                  "description": "Filled by Google automatically"
+                },
+                {
+                  "key": "state",
+                  "value": "STATE",
+                  "description": "Filled by Google automatically"
+                }
+              ]
+            },
+            "description": "Called automatically by Google after the user grants access. Do not call this manually."
+          }
+        },
+        {
+          "name": "Sync Emails",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/email-sync/sync",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "email-sync", "sync"]
+            },
+            "description": "Scans Gmail for BCA, Permata, and SeaBank transaction emails and imports them as transactions."
+          }
+        },
+        {
+          "name": "Get Status & Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/email-sync/status?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "email-sync", "status"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "Returns connection status (connected/disconnected) and paginated sync logs."
+          }
+        },
+        {
+          "name": "Disconnect Gmail",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{auth_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v2/email-sync/disconnect",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v2", "email-sync", "disconnect"]
+            },
+            "description": "Removes the stored Gmail OAuth token for the current user."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"log"
 	"my-api/dto"
 	"my-api/models"
 	"my-api/repositories"
@@ -9,27 +10,32 @@ import (
 )
 
 type TransactionV2Service interface {
-	GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error)
+	GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error)
 	GetTransactionByID(id, userID uint) (*dto.TransactionV2Response, error)
 	CreateTransaction(transaction *models.TransactionV2) error
 	UpdateTransaction(transaction *models.TransactionV2, oldAmount int, oldType int) error
 	DeleteTransaction(id, userID uint) error
 	GetAssetTransactions(assetID uint64, userID uint, page, limit int) (*dto.AssetTransactionsResponse, error)
+	AddTagsToTransaction(transactionID, userID uint, tagIDs []uint) error
+	RemoveTagFromTransaction(transactionID, userID, tagID uint) error
+	ReplaceTagsOnTransaction(transactionID, userID uint, tagIDs []uint) error
 }
 
 type transactionV2Service struct {
 	transactionRepo repositories.TransactionV2Repository
 	assetRepo       *repositories.AssetRepository
+	tagRepo         repositories.TagRepository
 }
 
-func NewTransactionV2Service(transactionRepo repositories.TransactionV2Repository, assetRepo *repositories.AssetRepository) TransactionV2Service {
+func NewTransactionV2Service(transactionRepo repositories.TransactionV2Repository, assetRepo *repositories.AssetRepository, tagRepo repositories.TagRepository) TransactionV2Service {
 	return &transactionV2Service{
 		transactionRepo: transactionRepo,
 		assetRepo:       assetRepo,
+		tagRepo:         tagRepo,
 	}
 }
 
-func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error) {
+func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]dto.TransactionV2Response, *dto.PaginationResponse, error) {
 	transactions, total, err := s.transactionRepo.GetAll(userID, page, limit, startDate, endDate, transactionType, categoryID, assetID)
 	if err != nil {
 		return nil, nil, err
@@ -49,19 +55,29 @@ func (s *transactionV2Service) GetTransactions(userID uint, page, limit int, sta
 			assetCurrency = t.Asset.Currency
 		}
 
+		categoryName := ""
+		if t.Category != nil {
+			categoryName = t.Category.CategoryName
+		}
+		bankName := ""
+		if t.Bank != nil {
+			bankName = t.Bank.BankName
+		}
+
 		transactionResponses[i] = dto.TransactionV2Response{
 			ID:              t.ID,
 			Description:     t.Description,
 			Amount:          t.Amount,
 			TransactionType: t.TransactionType,
 			Date:            t.Date,
-			CategoryName:    t.Category.CategoryName,
-			BankName:        t.Bank.BankName,
+			CategoryName:    categoryName,
+			BankName:        bankName,
 			AssetID:         t.AssetID,
 			AssetName:       assetName,
 			AssetType:       assetType,
 			AssetBalance:    assetBalance,
 			AssetCurrency:   assetCurrency,
+			Tags:            t.Tags,
 		}
 	}
 
@@ -98,19 +114,29 @@ func (s *transactionV2Service) GetTransactionByID(id, userID uint) (*dto.Transac
 		assetCurrency = transaction.Asset.Currency
 	}
 
+	catName := ""
+	if transaction.Category != nil {
+		catName = transaction.Category.CategoryName
+	}
+	bkName := ""
+	if transaction.Bank != nil {
+		bkName = transaction.Bank.BankName
+	}
+
 	response := &dto.TransactionV2Response{
 		ID:              transaction.ID,
 		Description:     transaction.Description,
 		Amount:          transaction.Amount,
 		TransactionType: transaction.TransactionType,
 		Date:            transaction.Date,
-		CategoryName:    transaction.Category.CategoryName,
-		BankName:        transaction.Bank.BankName,
+		CategoryName:    catName,
+		BankName:        bkName,
 		AssetID:         transaction.AssetID,
 		AssetName:       assetName,
 		AssetType:       assetType,
 		AssetBalance:    assetBalance,
 		AssetCurrency:   assetCurrency,
+		Tags:            transaction.Tags,
 	}
 
 	return response, nil
@@ -154,19 +180,29 @@ func (s *transactionV2Service) GetAssetTransactions(assetID uint64, userID uint,
 			totalExpense += float64(t.Amount)
 		}
 
+		assetCatName := ""
+		if t.Category != nil {
+			assetCatName = t.Category.CategoryName
+		}
+		assetBkName := ""
+		if t.Bank != nil {
+			assetBkName = t.Bank.BankName
+		}
+
 		transactionResponses[i] = dto.TransactionV2Response{
 			ID:              t.ID,
 			Description:     t.Description,
 			Amount:          t.Amount,
 			TransactionType: t.TransactionType,
 			Date:            t.Date,
-			CategoryName:    t.Category.CategoryName,
-			BankName:        t.Bank.BankName,
+			CategoryName:    assetCatName,
+			BankName:        assetBkName,
 			AssetID:         t.AssetID,
 			AssetName:       asset.Name,
 			AssetType:       asset.Type,
 			AssetBalance:    asset.Balance,
 			AssetCurrency:   asset.Currency,
+			Tags:            t.Tags,
 		}
 	}
 
@@ -185,4 +221,60 @@ func (s *transactionV2Service) GetAssetTransactions(assetID uint64, userID uint,
 		TotalIncome:    totalIncome,
 		TotalExpense:   totalExpense,
 	}, nil
+}
+
+func (s *transactionV2Service) AddTagsToTransaction(transactionID, userID uint, tagIDs []uint) error {
+	// Verify transaction belongs to user
+	_, err := s.transactionRepo.GetByID(transactionID, userID)
+	if err != nil {
+		return err
+	}
+
+	// Verify all tags belong to user
+	for _, tagID := range tagIDs {
+		_, err := s.tagRepo.FindByID(tagID, userID)
+		if err != nil {
+			return errors.New("one or more tags not found or do not belong to you")
+		}
+	}
+
+	// Add tags to transaction
+	err = s.transactionRepo.AddTagsToTransaction(transactionID, tagIDs)
+	if err != nil {
+		return err
+	}
+
+	// Increment usage count for all tags
+	for _, tagID := range tagIDs {
+		if err := s.tagRepo.IncrementUsage(tagID); err != nil {
+			// Log the error but don't fail the operation
+			// as the tags are already added successfully
+			log.Printf("Failed to increment usage count for tag %d: %v", tagID, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *transactionV2Service) RemoveTagFromTransaction(transactionID, userID, tagID uint) error {
+	// Verify transaction belongs to user
+	_, err := s.transactionRepo.GetByID(transactionID, userID)
+	if err != nil {
+		return err
+	}
+
+	return s.transactionRepo.RemoveTagFromTransaction(transactionID, tagID)
+}
+
+func (s *transactionV2Service) ReplaceTagsOnTransaction(transactionID, userID uint, tagIDs []uint) error {
+	_, err := s.transactionRepo.GetByID(transactionID, userID)
+	if err != nil {
+		return err
+	}
+	for _, tagID := range tagIDs {
+		if _, err := s.tagRepo.FindByID(tagID, userID); err != nil {
+			return errors.New("one or more tags not found or do not belong to you")
+		}
+	}
+	return s.transactionRepo.ReplaceTagsOnTransaction(transactionID, tagIDs)
 }

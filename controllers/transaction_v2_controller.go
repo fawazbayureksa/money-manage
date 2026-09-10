@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"log"
 	"my-api/dto"
 	"my-api/models"
 	"my-api/services"
@@ -14,11 +15,13 @@ import (
 
 type TransactionV2Controller struct {
 	transactionService services.TransactionV2Service
+	budgetService      services.BudgetService
 }
 
-func NewTransactionV2Controller(transactionService services.TransactionV2Service) *TransactionV2Controller {
+func NewTransactionV2Controller(transactionService services.TransactionV2Service, budgetService services.BudgetService) *TransactionV2Controller {
 	return &TransactionV2Controller{
 		transactionService: transactionService,
+		budgetService:      budgetService,
 	}
 }
 
@@ -36,11 +39,16 @@ func (ctrl *TransactionV2Controller) GetTransactions(c *gin.Context) {
 	}
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	// Accept both page_size and limit for backward compatibility
+	pageSize := c.Query("page_size")
+	if pageSize == "" {
+		pageSize = c.DefaultQuery("limit", "10")
+	}
+	limit, _ := strconv.Atoi(pageSize)
 
 	var startDate, endDate *time.Time
 	var transactionType *int
-	var categoryID *uint64
+	var categoryID *uint
 	var assetID *uint64
 
 	if startDateStr := c.Query("start_date"); startDateStr != "" {
@@ -73,15 +81,16 @@ func (ctrl *TransactionV2Controller) GetTransactions(c *gin.Context) {
 	}
 
 	if catIDStr := c.Query("category_id"); catIDStr != "" {
-		if catID, err := strconv.ParseUint(catIDStr, 10, 64); err == nil {
-			catIDUint := catID
-			categoryID = &catIDUint
+		if catID, err := strconv.ParseUint(catIDStr, 10, 32); err == nil {
+			temp := uint(catID)
+			categoryID = &temp
 		}
 	}
 
 	if assetIDStr := c.Query("asset_id"); assetIDStr != "" {
 		if aID, err := strconv.ParseUint(assetIDStr, 10, 64); err == nil {
-			assetID = &aID
+			temp := aID
+			assetID = &temp
 		}
 	}
 
@@ -170,12 +179,12 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 	transaction := &models.TransactionV2{
 		UserID:          userIDUint,
 		Description:     req.Description,
-		CategoryID:      req.CategoryID,
+		CategoryID:      &req.CategoryID,
 		AssetID:         req.AssetID,
 		Amount:          req.Amount,
 		TransactionType: transactionType,
 		Date:            utils.CustomTime{Time: date},
-		BankID:          0, // Optional for v2
+		BankID:          nil,
 	}
 
 	if err := ctrl.transactionService.CreateTransaction(transaction); err != nil {
@@ -195,10 +204,32 @@ func (ctrl *TransactionV2Controller) CreateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Add tags if provided
+	tagError := ""
+	if len(req.TagIDs) > 0 {
+		if err := ctrl.transactionService.AddTagsToTransaction(transaction.ID, userIDUint, req.TagIDs); err != nil {
+			// Transaction is already created, so we don't fail here
+			// Log the error and inform the user
+			log.Printf("Failed to add tags to transaction %d: %v", transaction.ID, err)
+			tagError = "Warning: Transaction created but failed to add some tags"
+		}
+	}
+
+	// Check budget alerts if this is an expense transaction
+	if transaction.TransactionType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+	}
+
 	created, _ := ctrl.transactionService.GetTransactionByID(transaction.ID, userIDUint)
+	
+	message := "Transaction created successfully"
+	if tagError != "" {
+		message = tagError
+	}
+	
 	c.JSON(http.StatusCreated, gin.H{
 		"success": true,
-		"message": "Transaction created successfully",
+		"message": message,
 		"data":    created,
 	})
 }
@@ -241,19 +272,19 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 		ID:              uint(id),
 		UserID:          userIDUint,
 		Description:     existing.Description,
-		CategoryID:      0,
+		CategoryID:      nil,
 		AssetID:         existing.AssetID,
 		Amount:          existing.Amount,
 		TransactionType: existing.TransactionType,
 		Date:            existing.Date,
-		BankID:          0,
+		BankID:          nil,
 	}
 
 	if req.Description != nil {
 		transaction.Description = *req.Description
 	}
 	if req.CategoryID != nil {
-		transaction.CategoryID = *req.CategoryID
+		transaction.CategoryID = req.CategoryID
 	}
 	if req.AssetID != nil {
 		transaction.AssetID = *req.AssetID
@@ -289,6 +320,19 @@ func (ctrl *TransactionV2Controller) UpdateTransaction(c *gin.Context) {
 		return
 	}
 
+	// Check budget alerts if transaction involves expenses (old or new type)
+	if transaction.TransactionType == 2 || oldType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
+	}
+
+	// Replace tags if tag_ids was provided in the request
+	if req.TagIDs != nil {
+		if err := ctrl.transactionService.ReplaceTagsOnTransaction(uint(id), userIDUint, *req.TagIDs); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": err.Error()})
+			return
+		}
+	}
+
 	updated, _ := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -316,9 +360,21 @@ func (ctrl *TransactionV2Controller) DeleteTransaction(c *gin.Context) {
 		return
 	}
 
+	// Get transaction before deletion to check if it was an expense
+	transaction, err := ctrl.transactionService.GetTransactionByID(uint(id), userIDUint)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Transaction not found or unauthorized"})
+		return
+	}
+
 	if err := ctrl.transactionService.DeleteTransaction(uint(id), userIDUint); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "Transaction not found or unauthorized"})
 		return
+	}
+
+	// Check budget alerts if this was an expense transaction
+	if transaction.TransactionType == 2 {
+		ctrl.budgetService.CheckBudgetAlerts(userIDUint)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -347,7 +403,12 @@ func (ctrl *TransactionV2Controller) GetAssetTransactions(c *gin.Context) {
 	}
 
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	// Accept both page_size and limit for backward compatibility
+	pageSize := c.Query("page_size")
+	if pageSize == "" {
+		pageSize = c.DefaultQuery("limit", "50")
+	}
+	limit, _ := strconv.Atoi(pageSize)
 
 	response, err := ctrl.transactionService.GetAssetTransactions(assetID, userIDUint, page, limit)
 	if err != nil {
@@ -360,4 +421,72 @@ func (ctrl *TransactionV2Controller) GetAssetTransactions(c *gin.Context) {
 		"message": "Asset transactions fetched successfully",
 		"data":    response,
 	})
+}
+
+// AddTagsToTransaction adds tags to an existing transaction
+func (ctrl *TransactionV2Controller) AddTagsToTransaction(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, utils.ErrorResponse("User not authenticated"))
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, utils.ErrorResponse("Invalid user ID"))
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid transaction ID"))
+		return
+	}
+
+	var req dto.AddTagsToTransactionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	if err := ctrl.transactionService.AddTagsToTransaction(uint(id), userIDUint, req.TagIDs); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, utils.SuccessResponse("Tags added to transaction successfully", nil))
+}
+
+// RemoveTagFromTransaction removes a tag from a transaction
+func (ctrl *TransactionV2Controller) RemoveTagFromTransaction(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, utils.ErrorResponse("User not authenticated"))
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, utils.ErrorResponse("Invalid user ID"))
+		return
+	}
+
+	transactionID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid transaction ID"))
+		return
+	}
+
+	tagID, err := strconv.ParseUint(c.Param("tag_id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse("Invalid tag ID"))
+		return
+	}
+
+	if err := ctrl.transactionService.RemoveTagFromTransaction(uint(transactionID), userIDUint, uint(tagID)); err != nil {
+		c.JSON(http.StatusBadRequest, utils.ErrorResponse(err.Error()))
+		return
+	}
+
+	c.JSON(http.StatusOK, utils.SuccessResponse("Tag removed from transaction successfully", nil))
 }

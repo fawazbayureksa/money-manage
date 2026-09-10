@@ -56,7 +56,12 @@ func (ctrl *TransactionController) GetTransactions(c *gin.Context) {
 
     // Parse query parameters
     page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-    limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+    // Accept both page_size and limit for backward compatibility
+    pageSize := c.Query("page_size")
+    if pageSize == "" {
+        pageSize = c.DefaultQuery("limit", "10")
+    }
+    limit, _ := strconv.Atoi(pageSize)
 
     // Parse optional filters
     var startDate, endDate *time.Time

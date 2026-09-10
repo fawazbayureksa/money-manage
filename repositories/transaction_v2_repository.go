@@ -9,13 +9,16 @@ import (
 )
 
 type TransactionV2Repository interface {
-	GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]models.TransactionV2, int64, error)
+	GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]models.TransactionV2, int64, error)
 	GetByID(id, userID uint) (*models.TransactionV2, error)
 	GetByIDWithAsset(id, userID uint) (*models.TransactionV2, error)
 	CreateWithBalanceUpdate(transaction *models.TransactionV2) error
 	UpdateWithBalanceUpdate(transaction *models.TransactionV2, oldAmount int, oldType int) error
 	DeleteWithBalanceRollback(id, userID uint) error
 	GetByAssetID(assetID uint64, userID uint, page, limit int) ([]models.TransactionV2, int64, error)
+	AddTagsToTransaction(transactionID uint, tagIDs []uint) error
+	RemoveTagFromTransaction(transactionID uint, tagID uint) error
+	ReplaceTagsOnTransaction(transactionID uint, tagIDs []uint) error
 }
 
 type transactionV2Repository struct {
@@ -26,7 +29,7 @@ func NewTransactionV2Repository(db *gorm.DB) TransactionV2Repository {
 	return &transactionV2Repository{db: db}
 }
 
-func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID, assetID *uint64) ([]models.TransactionV2, int64, error) {
+func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate, endDate *time.Time, transactionType *int, categoryID *uint, assetID *uint64) ([]models.TransactionV2, int64, error) {
 	var transactions []models.TransactionV2
 	var total int64
 
@@ -55,6 +58,7 @@ func (r *transactionV2Repository) GetAll(userID uint, page, limit int, startDate
 		Preload("Category").
 		Preload("Bank").
 		Preload("Asset").
+		Preload("Tags").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
@@ -69,6 +73,7 @@ func (r *transactionV2Repository) GetByID(id, userID uint) (*models.TransactionV
 		Preload("Category").
 		Preload("Bank").
 		Preload("Asset").
+		Preload("Tags").
 		Where("id = ? AND user_id = ?", id, userID).
 		First(&transaction).Error
 
@@ -114,6 +119,11 @@ func (r *transactionV2Repository) CreateWithBalanceUpdate(transaction *models.Tr
 
 func (r *transactionV2Repository) UpdateWithBalanceUpdate(transaction *models.TransactionV2, oldAmount int, oldType int) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		// No asset linked — just save without balance adjustment
+		if transaction.AssetID == 0 {
+			return tx.Omit("created_at").Save(transaction).Error
+		}
+
 		var asset models.Asset
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
 			First(&asset, transaction.AssetID).Error; err != nil {
@@ -144,7 +154,7 @@ func (r *transactionV2Repository) UpdateWithBalanceUpdate(transaction *models.Tr
 			return err
 		}
 
-		return tx.Save(transaction).Error
+		return tx.Omit("created_at").Save(transaction).Error
 	})
 }
 
@@ -154,6 +164,11 @@ func (r *transactionV2Repository) DeleteWithBalanceRollback(id, userID uint) err
 		if err := tx.Where("id = ? AND user_id = ?", id, userID).
 			First(&transaction).Error; err != nil {
 			return err
+		}
+
+		// No asset linked — just delete without balance rollback
+		if transaction.AssetID == 0 {
+			return tx.Delete(&transaction).Error
 		}
 
 		var asset models.Asset
@@ -189,10 +204,70 @@ func (r *transactionV2Repository) GetByAssetID(assetID uint64, userID uint, page
 	err := query.
 		Preload("Category").
 		Preload("Bank").
+		Preload("Tags").
 		Order("date DESC, id DESC").
 		Limit(limit).
 		Offset(offset).
 		Find(&transactions).Error
 
 	return transactions, total, err
+}
+
+func (r *transactionV2Repository) AddTagsToTransaction(transactionID uint, tagIDs []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var transaction models.TransactionV2
+		if err := tx.First(&transaction, transactionID).Error; err != nil {
+			return err
+		}
+
+		// Get the tags
+		var tags []models.Tag
+		if err := tx.Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+			return err
+		}
+
+		// Associate tags with transaction
+		if err := tx.Model(&transaction).Association("Tags").Append(&tags); err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
+
+func (r *transactionV2Repository) ReplaceTagsOnTransaction(transactionID uint, tagIDs []uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var transaction models.TransactionV2
+		if err := tx.First(&transaction, transactionID).Error; err != nil {
+			return err
+		}
+		var tags []models.Tag
+		if len(tagIDs) > 0 {
+			if err := tx.Where("id IN ?", tagIDs).Find(&tags).Error; err != nil {
+				return err
+			}
+		}
+		return tx.Model(&transaction).Association("Tags").Replace(&tags)
+	})
+}
+
+func (r *transactionV2Repository) RemoveTagFromTransaction(transactionID uint, tagID uint) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var transaction models.TransactionV2
+		if err := tx.First(&transaction, transactionID).Error; err != nil {
+			return err
+		}
+
+		var tag models.Tag
+		if err := tx.First(&tag, tagID).Error; err != nil {
+			return err
+		}
+
+		// Remove tag from transaction
+		if err := tx.Model(&transaction).Association("Tags").Delete(&tag); err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
