@@ -21,6 +21,7 @@ func SetupRouter(router *gin.Engine) {
 	tagRepo := repositories.NewTagRepository(config.DB)
 	userSettingsRepo := repositories.NewUserSettingsRepository(config.DB)
 	emailSyncRepo := repositories.NewEmailSyncRepository(config.DB)
+	debtRepo := repositories.NewDebtRepository(config.DB)
 
 	// Initialize services
 	userService := services.NewUserService(userRepo)
@@ -33,6 +34,7 @@ func SetupRouter(router *gin.Engine) {
 	tagService := services.NewTagService(tagRepo)
 	userSettingsService := services.NewUserSettingsService(userSettingsRepo)
 	emailSyncService := services.NewEmailSyncService(emailSyncRepo, assetRepo, transactionV2Repo, config.DB)
+	debtService := services.NewDebtService(debtRepo, transactionV2Repo)
 
 	// Initialize controllers
 	authController := controllers.NewAuthController(userService)
@@ -46,6 +48,7 @@ func SetupRouter(router *gin.Engine) {
 	tagController := controllers.NewTagController(tagService)
 	userSettingsController := controllers.NewUserSettingsController(userSettingsService)
 	emailSyncController := controllers.NewEmailSyncController(emailSyncService)
+	debtController := controllers.NewDebtController(debtService)
 
 	// Public OAuth2 callback (no JWT required)
 	router.GET("/api/v2/email-sync/callback", emailSyncController.HandleCallback)
@@ -117,6 +120,18 @@ func SetupRouter(router *gin.Engine) {
 			v2.POST("/email-sync/sync", emailSyncController.SyncEmails)
 			v2.GET("/email-sync/status", emailSyncController.GetStatus)
 			v2.DELETE("/email-sync/disconnect", emailSyncController.Disconnect)
+
+			// Debt Tracker endpoints
+			// NOTE: /debts/strategies must come before /debts/:id to avoid routing conflict
+			v2.GET("/debts/strategies", debtController.GetPayoffStrategies)
+			v2.GET("/debts", debtController.GetAllDebts)
+			v2.POST("/debts", debtController.CreateDebt)
+			v2.GET("/debts/:id", debtController.GetDebt)
+			v2.PUT("/debts/:id", debtController.UpdateDebt)
+			v2.DELETE("/debts/:id", debtController.DeleteDebt)
+			v2.POST("/debts/:id/payments", debtController.RecordPayment)
+			v2.PUT("/debts/:id/balance", debtController.UpdateBalance)
+			v2.GET("/debts/:id/timeline", debtController.GetPayoffTimeline)
 		}
 
 		// Category routes
