@@ -13,8 +13,8 @@ type CreateDebtRequest struct {
 	DebtType       string           `json:"debt_type" binding:"required,oneof=credit_card personal_loan mortgage car_loan student_loan other"`
 	CreditorName   string           `json:"creditor_name" binding:"omitempty,max=100"`
 	OriginalAmount int              `json:"original_amount" binding:"required,min=1"`
-	CurrentBalance int              `json:"current_balance" binding:"required,min=0"`
-	InterestRate   float64          `json:"interest_rate" binding:"required,min=0,max=100"`
+	CurrentBalance int              `json:"current_balance" binding:"min=0"`
+	InterestRate   float64          `json:"interest_rate" binding:"min=0,max=100"`
 	InterestType   string           `json:"interest_type" binding:"omitempty,oneof=fixed variable"`
 	MinimumPayment int              `json:"minimum_payment" binding:"required,min=1"`
 	PaymentDueDay  int              `json:"payment_due_day" binding:"required,min=1,max=31"`
@@ -51,7 +51,7 @@ type RecordDebtPaymentRequest struct {
 }
 
 type UpdateDebtBalanceRequest struct {
-	NewBalance int              `json:"new_balance" binding:"required,min=0"`
+	NewBalance int              `json:"new_balance" binding:"min=0"`
 	AsOfDate   utils.CustomTime `json:"as_of_date" binding:"required"`
 }
 
